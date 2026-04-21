@@ -2,6 +2,7 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 import { ImportExport } from "./ImportExport";
+import { GoogleDriveSync } from "./GoogleDriveSync";
 
 interface SettingsProps {
     onClose: () => void;
@@ -95,6 +96,7 @@ export function Settings({ onClose }: SettingsProps) {
                 </div>
 
                 <ImportExport />
+                <GoogleDriveSync />
             </div>
         </div>
     );
