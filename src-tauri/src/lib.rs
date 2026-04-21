@@ -28,6 +28,45 @@ struct PasswordItem {
     title: String,
     username: String,
     encrypted_payload: String,
+    is_favorite: bool,
+}
+
+fn ensure_schema(conn: &Connection) -> Result<(), String> {
+    conn.execute_batch("
+        CREATE TABLE IF NOT EXISTS vaults (
+            id TEXT PRIMARY KEY,
+            salt TEXT NOT NULL,
+            enc_dek_pwd TEXT NOT NULL,
+            enc_dek_recovery TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS items (
+            id TEXT PRIMARY KEY,
+            category TEXT NOT NULL DEFAULT 'login',
+            title TEXT NOT NULL,
+            username TEXT,
+            encrypted_payload TEXT NOT NULL,
+            is_favorite INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS tags (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE
+        );
+        CREATE TABLE IF NOT EXISTS item_tags (
+            item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+            PRIMARY KEY (item_id, tag_id)
+        );
+        CREATE TABLE IF NOT EXISTS attachments (
+            id TEXT PRIMARY KEY,
+            item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            filename TEXT NOT NULL,
+            encrypted_bytes TEXT NOT NULL
+        );
+        PRAGMA foreign_keys = ON;
+    ").map_err(|e| e.to_string())?;
+    // Safe migration for DBs created before is_favorite existed
+    let _ = conn.execute("ALTER TABLE items ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0", []);
+    Ok(())
 }
 
 fn get_db_conn(state: &State<AppState>) -> Result<Connection, String> {
@@ -48,46 +87,17 @@ fn check_vault_exists(app_handle: AppHandle, state: State<AppState>) -> Result<b
     }
     
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
-    // Simple schema migration for existing development databases
-    let _ = conn.execute("ALTER TABLE items ADD COLUMN category TEXT DEFAULT 'login'", []);
-    let count: i64 = conn.query_row(
-        "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='vaults'",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
-    
-    if count == 0 {
-        return Ok(false);
-    }
-    
-    let vault_count: i64 = conn.query_row("SELECT count(*) FROM vaults", [], |row| row.get(0)).unwrap_or(0);
+    ensure_schema(&conn)?;
+    let vault_count: i64 = conn
+        .query_row("SELECT count(*) FROM vaults", [], |row| row.get(0))
+        .unwrap_or(0);
     Ok(vault_count > 0)
 }
 
 #[tauri::command]
 fn create_vault(state: State<AppState>, password: &str, secret_key: &str) -> Result<(), String> {
     let conn = get_db_conn(&state)?;
-    
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS vaults (
-            id TEXT PRIMARY KEY,
-            salt TEXT NOT NULL,
-            enc_dek_pwd TEXT NOT NULL,
-            enc_dek_recovery TEXT NOT NULL
-        )",
-        [],
-    ).map_err(|e| e.to_string())?;
-    
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS items (
-            id TEXT PRIMARY KEY,
-            category TEXT NOT NULL DEFAULT 'login',
-            title TEXT NOT NULL,
-            username TEXT,
-            encrypted_payload TEXT NOT NULL
-        )",
-        [],
-    ).map_err(|e| e.to_string())?;
+    ensure_schema(&conn)?;
 
     let salt = SaltString::generate(&mut ArgonOsRng);
     
@@ -193,31 +203,38 @@ fn get_items(state: State<AppState>) -> Result<Vec<PasswordItem>, String> {
         return Err("Vault is locked".into());
     }
     let conn = get_db_conn(&state)?;
-    let mut stmt = conn.prepare("SELECT id, category, title, username, encrypted_payload FROM items").map_err(|e| e.to_string())?;
-    
-    let items_iter = stmt.query_map([], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, String>(2)?,
-            row.get::<_, String>(3)?,
-            row.get::<_, String>(4)?,
-        ))
-    }).map_err(|e| e.to_string())?;
-    
+    let mut stmt = conn
+        .prepare("SELECT id, category, title, username, encrypted_payload, is_favorite FROM items ORDER BY is_favorite DESC, title ASC")
+        .map_err(|e| e.to_string())?;
+
+    let items_iter = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, i64>(5)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
     let mut items = Vec::new();
     for row in items_iter {
-        let (id, enc_cat, enc_title, enc_user, enc_payload) = row.map_err(|e| e.to_string())?;
-        
+        let (id, enc_cat, enc_title, enc_user, enc_payload, is_fav) =
+            row.map_err(|e| e.to_string())?;
         items.push(PasswordItem {
             id,
-            category: decrypt_data_internal(&state, &enc_cat).unwrap_or_else(|_| "login".to_string()),
-            title: decrypt_data_internal(&state, &enc_title).unwrap_or_else(|_| "Unknown".to_string()),
+            category: decrypt_data_internal(&state, &enc_cat)
+                .unwrap_or_else(|_| "login".to_string()),
+            title: decrypt_data_internal(&state, &enc_title)
+                .unwrap_or_else(|_| "Unknown".to_string()),
             username: decrypt_data_internal(&state, &enc_user).unwrap_or_default(),
             encrypted_payload: enc_payload,
+            is_favorite: is_fav == 1,
         });
     }
-    
     Ok(items)
 }
 
@@ -344,6 +361,155 @@ fn import_vault_data(app_handle: AppHandle, base64_data: &str) -> Result<(), Str
     Ok(())
 }
 
+#[tauri::command]
+fn get_tags(state: State<AppState>) -> Result<Vec<(String, String)>, String> {
+    let conn = get_db_conn(&state)?;
+    let mut stmt = conn
+        .prepare("SELECT id, name FROM tags ORDER BY name")
+        .map_err(|e| e.to_string())?;
+    let result = stmt
+        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string());
+    result
+}
+
+#[tauri::command]
+fn create_tag(state: State<AppState>, id: &str, name: &str) -> Result<(), String> {
+    let conn = get_db_conn(&state)?;
+    conn.execute(
+        "INSERT OR IGNORE INTO tags (id, name) VALUES (?1, ?2)",
+        params![id, name],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_tag(state: State<AppState>, id: &str) -> Result<(), String> {
+    let conn = get_db_conn(&state)?;
+    conn.execute("DELETE FROM tags WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn get_item_tags(state: State<AppState>, item_id: &str) -> Result<Vec<(String, String)>, String> {
+    let conn = get_db_conn(&state)?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT t.id, t.name FROM tags t
+             JOIN item_tags it ON t.id = it.tag_id
+             WHERE it.item_id = ?1 ORDER BY t.name",
+        )
+        .map_err(|e| e.to_string())?;
+    let result = stmt
+        .query_map(params![item_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string());
+    result
+}
+
+#[tauri::command]
+fn set_item_tags(
+    state: State<AppState>,
+    item_id: &str,
+    tag_ids: Vec<String>,
+) -> Result<(), String> {
+    let conn = get_db_conn(&state)?;
+    conn.execute("DELETE FROM item_tags WHERE item_id = ?1", params![item_id])
+        .map_err(|e| e.to_string())?;
+    for tag_id in tag_ids {
+        conn.execute(
+            "INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
+            params![item_id, tag_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn toggle_favorite(state: State<AppState>, id: &str) -> Result<bool, String> {
+    let conn = get_db_conn(&state)?;
+    let current: i64 = conn
+        .query_row(
+            "SELECT is_favorite FROM items WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Item not found".to_string())?;
+    let new_val = if current == 0 { 1i64 } else { 0i64 };
+    conn.execute(
+        "UPDATE items SET is_favorite = ?1 WHERE id = ?2",
+        params![new_val, id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(new_val == 1)
+}
+
+#[tauri::command]
+fn add_attachment(
+    state: State<AppState>,
+    id: &str,
+    item_id: &str,
+    filename: &str,
+    data_b64: &str,
+) -> Result<(), String> {
+    let encrypted = encrypt_data_internal(&state, data_b64)?;
+    let conn = get_db_conn(&state)?;
+    conn.execute(
+        "INSERT OR REPLACE INTO attachments (id, item_id, filename, encrypted_bytes) VALUES (?1, ?2, ?3, ?4)",
+        params![id, item_id, filename, encrypted],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn get_attachments(
+    state: State<AppState>,
+    item_id: &str,
+) -> Result<Vec<(String, String)>, String> {
+    let conn = get_db_conn(&state)?;
+    let mut stmt = conn
+        .prepare("SELECT id, filename FROM attachments WHERE item_id = ?1")
+        .map_err(|e| e.to_string())?;
+    let result = stmt
+        .query_map(params![item_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string());
+    result
+}
+
+#[tauri::command]
+fn get_attachment_data(state: State<AppState>, id: &str) -> Result<String, String> {
+    let conn = get_db_conn(&state)?;
+    let encrypted: String = conn
+        .query_row(
+            "SELECT encrypted_bytes FROM attachments WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Attachment not found".to_string())?;
+    decrypt_data_internal(&state, &encrypted)
+}
+
+#[tauri::command]
+fn delete_attachment(state: State<AppState>, id: &str) -> Result<(), String> {
+    let conn = get_db_conn(&state)?;
+    conn.execute("DELETE FROM attachments WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -366,7 +532,17 @@ pub fn run() {
             change_password,
             recover_vault,
             export_vault_data,
-            import_vault_data
+            import_vault_data,
+            get_tags,
+            create_tag,
+            delete_tag,
+            get_item_tags,
+            set_item_tags,
+            toggle_favorite,
+            add_attachment,
+            get_attachments,
+            get_attachment_data,
+            delete_attachment,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
