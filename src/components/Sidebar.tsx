@@ -17,10 +17,11 @@ interface SidebarProps {
     onCategoryChange: (cat: FilterCategory) => void;
     onSettings: () => void;
     onSync: () => void;
+    onGenerator: () => void;
     onLock: () => void;
 }
 
-export function Sidebar({ selectedCategory, onCategoryChange, onSettings, onSync, onLock }: SidebarProps) {
+export function Sidebar({ selectedCategory, onCategoryChange, onSettings, onSync, onGenerator, onLock }: SidebarProps) {
     return (
         <div className="sidebar">
             <div className="sidebar-header">
@@ -49,6 +50,9 @@ export function Sidebar({ selectedCategory, onCategoryChange, onSettings, onSync
                 </button>
                 <button className="lock-btn" onClick={onSync} style={{ background: 'transparent', color: 'var(--text-secondary)' }}>
                     Sync
+                </button>
+                <button className="lock-btn" onClick={onGenerator} style={{ background: 'transparent', color: 'var(--text-secondary)' }}>
+                    Generator
                 </button>
                 <button className="lock-btn" onClick={onLock}>Tresor sperren</button>
             </div>
