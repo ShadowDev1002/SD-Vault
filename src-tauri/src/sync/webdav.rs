@@ -16,25 +16,21 @@ impl WebDavProvider {
         Self { vault_url, hash_url, username, password }
     }
 
-    fn client(&self) -> reqwest::blocking::Client {
-        reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(60))
-            .build()
-            .expect("failed to build reqwest client")
-    }
 }
 
 impl SyncProvider for WebDavProvider {
     fn upload(&self, vault_bytes: &[u8], hash: &str) -> Result<(), String> {
-        let client = self.client();
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .map_err(|e| format!("HTTP client error: {}", e))?;
 
         // Attempt to create parent directory (ignore errors — may already exist)
         if let Some(parent) = self.vault_url.rsplit_once('/').map(|(p, _)| p) {
+            let mkcol = reqwest::Method::from_bytes(b"MKCOL")
+                .unwrap_or(reqwest::Method::PUT);
             let _ = client
-                .request(
-                    reqwest::Method::from_bytes(b"MKCOL").unwrap(),
-                    parent,
-                )
+                .request(mkcol, parent)
                 .basic_auth(&self.username, Some(&self.password))
                 .send();
         }
@@ -61,8 +57,12 @@ impl SyncProvider for WebDavProvider {
     }
 
     fn download(&self) -> Result<Vec<u8>, String> {
-        let resp = self
-            .client()
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .map_err(|e| format!("HTTP client error: {}", e))?;
+
+        let resp = client
             .get(&self.vault_url)
             .basic_auth(&self.username, Some(&self.password))
             .send()
@@ -75,8 +75,12 @@ impl SyncProvider for WebDavProvider {
     }
 
     fn remote_hash(&self) -> Result<Option<String>, String> {
-        let resp = self
-            .client()
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .map_err(|e| format!("HTTP client error: {}", e))?;
+
+        let resp = client
             .get(&self.hash_url)
             .basic_auth(&self.username, Some(&self.password))
             .send()
