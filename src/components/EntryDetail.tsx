@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Plus, Copy, Trash2, RefreshCw, Eye, Star, Paperclip } from "lucide-react";
 import type { PasswordItem, DecryptedPayload, CustomField, ItemCategory, Tag, Attachment } from "../types";
@@ -24,6 +24,8 @@ export function EntryDetail({ item, isCreating, onSaved, onDeleted, onCancelCrea
     const [itemTags, setItemTags] = useState<Tag[]>([]);
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [revealedFields, setRevealedFields] = useState<Set<string>>(new Set());
+    const loadCancelRef = useRef(false);
 
     useEffect(() => {
         invoke<[string, string][]>("get_tags").then(raw =>
@@ -33,6 +35,8 @@ export function EntryDetail({ item, isCreating, onSaved, onDeleted, onCancelCrea
 
     useEffect(() => {
         if (isCreating) {
+            loadCancelRef.current = true;
+            setRevealedFields(new Set());
             setIsEditing(true);
             setEditTitle("Ohne Titel");
             setEditCategory('login');
@@ -41,14 +45,18 @@ export function EntryDetail({ item, isCreating, onSaved, onDeleted, onCancelCrea
             setItemTags([]);
             setPayload(null);
         } else if (item) {
+            setRevealedFields(new Set());
             setIsEditing(false);
             loadItem(item);
         }
+        return () => { loadCancelRef.current = true; };
     }, [item?.id, isCreating]);
 
     async function loadItem(item: PasswordItem) {
+        loadCancelRef.current = false;
         try {
             const raw = await invoke<string>("decrypt_data", { encryptedHex: item.encrypted_payload });
+            if (loadCancelRef.current) return;
             const parsed = JSON.parse(raw);
             setPayload(parsed.fields ? parsed : {
                 fields: Object.entries(parsed)
@@ -61,11 +69,12 @@ export function EntryDetail({ item, isCreating, onSaved, onDeleted, onCancelCrea
             });
         } catch { setPayload({ fields: [], notes: '' }); }
 
+        if (loadCancelRef.current) return;
         const rawTags = await invoke<[string, string][]>("get_item_tags", { itemId: item.id });
-        setItemTags(rawTags.map(([id, name]) => ({ id, name })));
+        if (!loadCancelRef.current) setItemTags(rawTags.map(([id, name]) => ({ id, name })));
 
         const rawAtts = await invoke<[string, string][]>("get_attachments", { itemId: item.id });
-        setAttachments(rawAtts.map(([id, filename]) => ({ id, filename })));
+        if (!loadCancelRef.current) setAttachments(rawAtts.map(([id, filename]) => ({ id, filename })));
     }
 
     async function handleSave() {
@@ -107,7 +116,9 @@ export function EntryDetail({ item, isCreating, onSaved, onDeleted, onCancelCrea
         if (!file || !item) return;
         const reader = new FileReader();
         reader.onload = async () => {
-            const b64 = (reader.result as string).split(",")[1];
+            if (typeof reader.result !== 'string') return;
+            const b64 = reader.result.split(",")[1];
+            if (!b64) return;
             await invoke("add_attachment", { id: crypto.randomUUID(), itemId: item.id, filename: file.name, dataB64: b64 });
             const raw = await invoke<[string, string][]>("get_attachments", { itemId: item.id });
             setAttachments(raw.map(([id, filename]) => ({ id, filename })));
@@ -125,6 +136,7 @@ export function EntryDetail({ item, isCreating, onSaved, onDeleted, onCancelCrea
         el.href = URL.createObjectURL(blob);
         el.download = att.filename;
         el.click();
+        setTimeout(() => URL.revokeObjectURL(el.href), 100);
     }
 
     async function handleDeleteAttachment(id: string) {
@@ -172,7 +184,14 @@ export function EntryDetail({ item, isCreating, onSaved, onDeleted, onCancelCrea
                     </>
                 ) : (
                     <>
-                        <button className="btn" onClick={() => { setEditTitle(item!.title); setEditCategory(item!.category); setEditFields(JSON.parse(JSON.stringify(payload?.fields ?? []))); setEditNotes(payload?.notes ?? ""); setIsEditing(true); }}>Bearbeiten</button>
+                        <button className="btn" onClick={() => {
+                            if (!item) return;
+                            setEditTitle(item.title);
+                            setEditCategory(item.category);
+                            setEditFields(JSON.parse(JSON.stringify(payload?.fields ?? [])));
+                            setEditNotes(payload?.notes ?? "");
+                            setIsEditing(true);
+                        }}>Bearbeiten</button>
                         <button className="btn" onClick={handleToggleFavorite} title={item?.is_favorite ? "Aus Favoriten entfernen" : "Zu Favoriten"}>
                             <Star size={15} fill={item?.is_favorite ? "#FFCC00" : "none"} color={item?.is_favorite ? "#FFCC00" : "currentColor"} />
                         </button>
@@ -234,21 +253,28 @@ export function EntryDetail({ item, isCreating, onSaved, onDeleted, onCancelCrea
                     ) : (
                         payload?.fields?.map(field => {
                             const sensitive = field.type === 'password' || field.type === 'totp';
+                            const isRevealed = revealedFields.has(field.id);
                             return (
                                 <div className="field-row" key={field.id}>
                                     <div className="field-label">{field.label}</div>
-                                    <div className={`field-value ${sensitive ? 'obscured monospace' : ''}`}>
-                                        {sensitive ? field.value.replace(/./g, '•') : field.value}
+                                    <div className={`field-value ${sensitive && !isRevealed ? 'obscured monospace' : ''}`}>
+                                        {sensitive && !isRevealed ? field.value.replace(/./g, '•') : field.value}
                                     </div>
                                     <div className="field-actions">
                                         {sensitive && (
-                                            <button className="icon-btn" onClick={e => {
-                                                const valNode = (e.currentTarget.parentElement?.parentElement as Element)?.querySelector('.field-value');
-                                                if (valNode) {
-                                                    valNode.textContent = field.value;
-                                                    valNode.classList.remove('obscured');
-                                                    setTimeout(() => { valNode.textContent = field.value.replace(/./g, '•'); valNode.classList.add('obscured'); }, 5000);
-                                                }
+                                            <button className="icon-btn" onClick={() => {
+                                                setRevealedFields(prev => {
+                                                    const next = new Set(prev);
+                                                    next.add(field.id);
+                                                    return next;
+                                                });
+                                                setTimeout(() => {
+                                                    setRevealedFields(prev => {
+                                                        const next = new Set(prev);
+                                                        next.delete(field.id);
+                                                        return next;
+                                                    });
+                                                }, 5000);
                                             }}><Eye size={16} /></button>
                                         )}
                                         <button className="icon-btn" onClick={() => copy(field.value)}><Copy size={16} /></button>
