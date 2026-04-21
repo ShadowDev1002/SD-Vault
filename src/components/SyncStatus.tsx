@@ -127,9 +127,13 @@ function ProviderForm({
 
     async function handleDelete() {
         if (!confirm(`${title}-Konfiguration löschen?`)) return;
-        await invoke("delete_sync_config", { id: provider });
-        setConfig(EMPTY_CONFIG(provider));
-        setSyncResult(null);
+        try {
+            await invoke("delete_sync_config", { id: provider });
+            setConfig(EMPTY_CONFIG(provider));
+            setSyncResult(null);
+        } catch (err) {
+            alert(`Fehler: ${err}`);
+        }
     }
 
     const inputStyle: React.CSSProperties = {

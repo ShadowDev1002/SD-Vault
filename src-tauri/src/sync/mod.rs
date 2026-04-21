@@ -127,10 +127,10 @@ fn load_configs(state: &State<AppState>) -> Result<Vec<SyncConfig>, String> {
             provider,
             enabled: enabled == 1,
             interval_secs,
-            remote_url: decrypt_data_internal(state, &enc_url).unwrap_or_default(),
-            remote_path: decrypt_data_internal(state, &enc_path).unwrap_or_default(),
-            username: decrypt_data_internal(state, &enc_user).unwrap_or_default(),
-            password: decrypt_data_internal(state, &enc_creds).unwrap_or_default(),
+            remote_url: decrypt_data_internal(state, &enc_url).map_err(|e| e.to_string())?,
+            remote_path: decrypt_data_internal(state, &enc_path).map_err(|e| e.to_string())?,
+            username: decrypt_data_internal(state, &enc_user).map_err(|e| e.to_string())?,
+            password: decrypt_data_internal(state, &enc_creds).map_err(|e| e.to_string())?,
             last_synced_at,
             last_remote_hash,
         });
@@ -228,6 +228,7 @@ pub async fn trigger_sync(state: State<'_, AppState>, config_id: String) -> Resu
     let new_hash = match &result {
         SyncResult::Uploaded => Some(local_hash(&db_path)?),
         SyncResult::Downloaded => Some(local_hash(&db_path)?),
+        SyncResult::Conflict { .. } => Some(local_hash(&db_path)?),
         SyncResult::UpToDate => last_hash,
         _ => last_hash,
     };
