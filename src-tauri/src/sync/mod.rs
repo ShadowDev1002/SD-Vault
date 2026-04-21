@@ -80,10 +80,12 @@ pub fn perform_sync(
                 (true, true) => {
                     let ts = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_default()
                         .as_secs();
                     let backup = db_path.with_file_name(format!("vaultzero_conflict_{}.db", ts));
                     std::fs::copy(db_path, &backup).map_err(|e| e.to_string())?;
+                    let remote_bytes = provider.download()?;
+                    std::fs::write(db_path, &remote_bytes).map_err(|e| e.to_string())?;
                     Ok(SyncResult::Conflict {
                         backup_path: backup.to_string_lossy().into_owned(),
                     })
@@ -233,7 +235,7 @@ pub async fn trigger_sync(state: State<'_, AppState>, config_id: String) -> Resu
     if let Some(hash) = new_hash {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs() as i64;
         let conn = get_db_conn(&state)?;
         conn.execute(
@@ -248,6 +250,9 @@ pub async fn trigger_sync(state: State<'_, AppState>, config_id: String) -> Resu
 
 #[tauri::command]
 pub fn get_last_sync_status(state: State<AppState>, config_id: &str) -> Result<Option<i64>, String> {
+    if state.master_key.lock().unwrap().is_none() {
+        return Err("Vault is locked".into());
+    }
     let conn = get_db_conn(&state)?;
     let ts: Option<i64> = conn
         .query_row(
