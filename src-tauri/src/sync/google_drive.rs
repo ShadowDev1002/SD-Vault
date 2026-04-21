@@ -115,7 +115,7 @@ impl SyncProvider for GoogleDriveProvider {
             .query(&[
                 ("spaces", "appDataFolder"),
                 ("q", "name = 'vault.db'"),
-                ("fields", "files(id)"),
+                ("fields", "files(id,appProperties)"),
             ])
             .bearer_auth(&self.access_token)
             .send()
@@ -125,33 +125,26 @@ impl SyncProvider for GoogleDriveProvider {
         if files.is_empty() {
             return Ok(None);
         }
-        let file_id = files[0]["id"].as_str().ok_or("Keine Datei-ID in Drive-Antwort")?.to_string();
-        *self.file_id.lock().unwrap() = Some(file_id.clone());
-
-        // Download the remote file and compute SHA256 so the hash format matches
-        // what trigger_sync stores via local_hash() (also SHA256).
-        let data_resp = client
-            .get(&format!(
-                "https://www.googleapis.com/drive/v3/files/{}?alt=media",
-                file_id
-            ))
-            .bearer_auth(&self.access_token)
-            .send()
-            .map_err(|e| e.to_string())?;
-        if !data_resp.status().is_success() {
-            return Err(format!("remote_hash Download fehlgeschlagen: HTTP {}", data_resp.status()));
+        if let Some(id) = files[0]["id"].as_str() {
+            *self.file_id.lock().unwrap() = Some(id.to_string());
         }
-        let bytes = data_resp.bytes().map_err(|e| e.to_string())?;
-        Ok(Some(format!("{:x}", Sha256::digest(&bytes))))
+        Ok(files[0]["appProperties"]["sha256"].as_str().map(|s| s.to_string()))
     }
 
-    fn upload(&self, vault_bytes: &[u8], _hash: &str) -> Result<(), String> {
+    fn upload(&self, vault_bytes: &[u8], hash: &str) -> Result<(), String> {
         let file_id = self.file_id.lock().unwrap().clone();
         let client = Client::new();
         let metadata = if file_id.is_none() {
-            serde_json::json!({ "name": "vault.db", "parents": ["appDataFolder"] })
+            serde_json::json!({
+                "name": "vault.db",
+                "parents": ["appDataFolder"],
+                "appProperties": { "sha256": hash }
+            })
         } else {
-            serde_json::json!({ "name": "vault.db" })
+            serde_json::json!({
+                "name": "vault.db",
+                "appProperties": { "sha256": hash }
+            })
         }
         .to_string();
 
