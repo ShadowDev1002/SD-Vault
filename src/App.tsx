@@ -5,6 +5,7 @@ import { Sidebar } from "./components/Sidebar";
 import { EntryList } from "./components/EntryList";
 import { EntryDetail } from "./components/EntryDetail";
 import { Settings } from "./components/Settings";
+import { SyncStatus } from "./components/SyncStatus";
 import type { PasswordItem, FilterCategory } from "./types";
 import "./App.css";
 
@@ -19,6 +20,7 @@ export default function App() {
     const [selectedItem, setSelectedItem] = useState<PasswordItem | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [showSync, setShowSync] = useState(false);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => { initApp(); }, []);
@@ -97,6 +99,7 @@ export default function App() {
                 onCategoryChange={setSelectedCategory}
                 onSettings={() => setShowSettings(true)}
                 onLock={lockVault}
+                onSync={() => setShowSync(true)}
             />
             <EntryList
                 items={items}
@@ -116,6 +119,7 @@ export default function App() {
                 onFavoriteToggled={loadItems}
             />
             {showSettings && <Settings onClose={() => setShowSettings(false)} />}
+            {showSync && <SyncStatus onClose={() => setShowSync(false)} />}
         </div>
     );
 }
