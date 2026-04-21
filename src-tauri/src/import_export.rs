@@ -118,7 +118,7 @@ fn insert_item(
 
 #[tauri::command]
 pub fn export_items(state: State<AppState>, password: String) -> Result<String, String> {
-    let guard = state.master_key.lock().unwrap();
+    let guard = state.master_key.lock().map_err(|_| "Lock poisoned")?;
     let master_key = guard.as_ref().ok_or("Vault is locked")?;
 
     let conn = get_db_conn(&state)?;
@@ -145,11 +145,9 @@ pub fn export_items(state: State<AppState>, password: String) -> Result<String, 
 
     let mut items: Vec<ExportItem> = Vec::new();
     for (id, enc_cat, enc_title, enc_user, enc_payload, is_fav) in rows {
-        let category = decrypt_data_with_key(master_key, &enc_cat)
-            .unwrap_or_else(|_| "login".into());
-        let title = decrypt_data_with_key(master_key, &enc_title)
-            .unwrap_or_else(|_| "Unknown".into());
-        let username = decrypt_data_with_key(master_key, &enc_user).unwrap_or_default();
+        let category = decrypt_data_with_key(master_key, &enc_cat)?;
+        let title = decrypt_data_with_key(master_key, &enc_title)?;
+        let username = decrypt_data_with_key(master_key, &enc_user)?;
         let payload_json = decrypt_data_with_key(master_key, &enc_payload)?;
         let payload: DecryptedPayload =
             serde_json::from_str(&payload_json).map_err(|e| e.to_string())?;
@@ -184,7 +182,7 @@ pub fn import_sdpx(
     data_base64: String,
     password: String,
 ) -> Result<usize, String> {
-    let guard = state.master_key.lock().unwrap();
+    let guard = state.master_key.lock().map_err(|_| "Lock poisoned")?;
     let master_key = **guard.as_ref().ok_or("Vault is locked")?;
     drop(guard);
 
@@ -210,7 +208,7 @@ pub fn import_sdpx(
 
 #[tauri::command]
 pub fn import_bitwarden_csv(state: State<AppState>, csv_text: String) -> Result<usize, String> {
-    let guard = state.master_key.lock().unwrap();
+    let guard = state.master_key.lock().map_err(|_| "Lock poisoned")?;
     let master_key = **guard.as_ref().ok_or("Vault is locked")?;
     drop(guard);
 
@@ -249,7 +247,7 @@ pub fn import_bitwarden_csv(state: State<AppState>, csv_text: String) -> Result<
                 let mut fields = Vec::new();
                 if !uname.is_empty() {
                     fields.push(CustomField {
-                        id: "u1".into(),
+                        id: new_id(),
                         label: "Benutzername".into(),
                         value: uname.clone(),
                         field_type: "text".into(),
@@ -257,7 +255,7 @@ pub fn import_bitwarden_csv(state: State<AppState>, csv_text: String) -> Result<
                 }
                 if !pwd.is_empty() {
                     fields.push(CustomField {
-                        id: "p1".into(),
+                        id: new_id(),
                         label: "Passwort".into(),
                         value: pwd,
                         field_type: "password".into(),
@@ -265,7 +263,7 @@ pub fn import_bitwarden_csv(state: State<AppState>, csv_text: String) -> Result<
                 }
                 if !uri.is_empty() {
                     fields.push(CustomField {
-                        id: "w1".into(),
+                        id: new_id(),
                         label: "Website".into(),
                         value: uri,
                         field_type: "url".into(),
@@ -273,7 +271,7 @@ pub fn import_bitwarden_csv(state: State<AppState>, csv_text: String) -> Result<
                 }
                 if !totp.is_empty() {
                     fields.push(CustomField {
-                        id: "t1".into(),
+                        id: new_id(),
                         label: "Einmalpasswort".into(),
                         value: totp,
                         field_type: "totp".into(),
@@ -290,7 +288,7 @@ pub fn import_bitwarden_csv(state: State<AppState>, csv_text: String) -> Result<
                 let mut fields = Vec::new();
                 if !holder.is_empty() {
                     fields.push(CustomField {
-                        id: "f1".into(),
+                        id: new_id(),
                         label: "Karteninhaber".into(),
                         value: holder,
                         field_type: "text".into(),
@@ -298,7 +296,7 @@ pub fn import_bitwarden_csv(state: State<AppState>, csv_text: String) -> Result<
                 }
                 if !number.is_empty() {
                     fields.push(CustomField {
-                        id: "f2".into(),
+                        id: new_id(),
                         label: "Kartennummer".into(),
                         value: number,
                         field_type: "text".into(),
@@ -307,7 +305,7 @@ pub fn import_bitwarden_csv(state: State<AppState>, csv_text: String) -> Result<
                 let exp = format!("{}/{}", exp_m, exp_y);
                 if exp != "/" {
                     fields.push(CustomField {
-                        id: "f3".into(),
+                        id: new_id(),
                         label: "Ablaufdatum".into(),
                         value: exp,
                         field_type: "text".into(),
@@ -315,7 +313,7 @@ pub fn import_bitwarden_csv(state: State<AppState>, csv_text: String) -> Result<
                 }
                 if !code.is_empty() {
                     fields.push(CustomField {
-                        id: "f4".into(),
+                        id: new_id(),
                         label: "Prüfnummer (CVV)".into(),
                         value: code,
                         field_type: "password".into(),
