@@ -42,6 +42,23 @@ fn percent_encode(s: &str) -> String {
     out
 }
 
+fn percent_decode(s: &str) -> String {
+    let mut out = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            let h1 = chars.next().and_then(|c| c.to_digit(16));
+            let h2 = chars.next().and_then(|c| c.to_digit(16));
+            if let (Some(h1), Some(h2)) = (h1, h2) {
+                out.push((h1 * 16 + h2) as u8 as char);
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 fn refresh_access_token(creds: &GoogleCredentials) -> Result<GoogleCredentials, String> {
     let client = Client::new();
     let resp = client
@@ -286,9 +303,14 @@ pub async fn complete_google_oauth(state: State<'_, AppState>) -> Result<(), Str
         .ok_or("DB path not set")?;
 
     tauri::async_runtime::spawn_blocking(move || {
-        let (mut stream, _) = oauth
-            .listener
-            .accept()
+        let listener = oauth.listener;
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(listener.accept());
+        });
+        let (mut stream, _) = rx
+            .recv_timeout(std::time::Duration::from_secs(120))
+            .map_err(|_| "OAuth-Timeout: Keine Browser-Antwort nach 2 Minuten".to_string())?
             .map_err(|e| format!("Verbindungsfehler beim Warten auf Browser: {}", e))?;
 
         use std::io::{Read, Write};
@@ -315,8 +337,8 @@ pub async fn complete_google_oauth(state: State<'_, AppState>) -> Result<(), Str
             .split('&')
             .find(|p| p.starts_with("code="))
             .and_then(|p| p.splitn(2, '=').nth(1))
-            .ok_or("Kein Autorisierungs-Code in der Callback-URL gefunden")?
-            .to_string();
+            .ok_or("Kein Autorisierungs-Code in der Callback-URL gefunden")
+            .map(percent_decode)?;
 
         let redirect_uri = format!("http://127.0.0.1:{}", oauth.port);
         let client = Client::new();
