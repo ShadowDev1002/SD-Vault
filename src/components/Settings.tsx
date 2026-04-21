@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
+import { ImportExport } from "./ImportExport";
 
 interface SettingsProps {
     onClose: () => void;
@@ -92,6 +93,8 @@ export function Settings({ onClose }: SettingsProps) {
                         <input type="file" onChange={handleImportVault} accept=".sdvault,.db" style={{ display: 'none' }} />
                     </label>
                 </div>
+
+                <ImportExport />
             </div>
         </div>
     );
