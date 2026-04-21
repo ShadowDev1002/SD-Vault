@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
+use std::net::TcpListener;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 use zeroize::Zeroizing;
@@ -19,9 +20,16 @@ use zeroize::Zeroizing;
 mod sync;
 mod import_export;
 
+pub(crate) struct GoogleOAuthState {
+    pub(crate) listener: TcpListener,
+    pub(crate) code_verifier: String,
+    pub(crate) port: u16,
+}
+
 pub(crate) struct AppState {
     pub(crate) master_key: Mutex<Option<Zeroizing<[u8; 32]>>>,
     pub(crate) db_path: Mutex<Option<PathBuf>>,
+    pub(crate) google_oauth_state: Mutex<Option<GoogleOAuthState>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -561,6 +569,7 @@ pub fn run() {
         .manage(AppState {
             master_key: Mutex::new(None),
             db_path: Mutex::new(None),
+            google_oauth_state: Mutex::new(None),
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -593,6 +602,9 @@ pub fn run() {
             sync::delete_sync_config,
             sync::trigger_sync,
             sync::get_last_sync_status,
+            sync::google_drive::start_google_oauth,
+            sync::google_drive::complete_google_oauth,
+            sync::google_drive::disconnect_google_drive,
             import_export::export_items,
             import_export::import_sdpx,
             import_export::import_bitwarden_csv,

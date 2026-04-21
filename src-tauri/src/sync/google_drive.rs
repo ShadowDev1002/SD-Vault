@@ -286,14 +286,10 @@ pub async fn complete_google_oauth(state: State<'_, AppState>) -> Result<(), Str
         .ok_or("DB path not set")?;
 
     tauri::async_runtime::spawn_blocking(move || {
-        oauth
-            .listener
-            .set_read_timeout(Some(std::time::Duration::from_secs(120)))
-            .map_err(|e| e.to_string())?;
         let (mut stream, _) = oauth
             .listener
             .accept()
-            .map_err(|e| format!("Timeout oder Verbindungsfehler beim Warten auf Browser: {}", e))?;
+            .map_err(|e| format!("Verbindungsfehler beim Warten auf Browser: {}", e))?;
 
         use std::io::{Read, Write};
         let mut buf = [0u8; 8192];

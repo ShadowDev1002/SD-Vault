@@ -1,5 +1,6 @@
 pub mod webdav;
 pub mod sftp;
+pub mod google_drive;
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -221,6 +222,25 @@ pub async fn trigger_sync(state: State<'_, AppState>, config_id: String) -> Resu
             })
             .await
             .map_err(|e| format!("SFTP task error: {}", e))?
+        }
+        "google_drive" => {
+            let creds_json = config.password.clone();
+            let master_key = {
+                let guard = state.master_key.lock().map_err(|_| "Lock poisoned")?;
+                **guard.as_ref().ok_or("Vault is locked")?
+            };
+            let db_path_clone = db_path.clone();
+            let last_hash_clone = last_hash.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let provider = google_drive::GoogleDriveProvider::from_creds_json(
+                    &creds_json,
+                    master_key,
+                    &db_path_clone,
+                )?;
+                perform_sync(&provider, &db_path_clone, last_hash_clone.as_deref())
+            })
+            .await
+            .map_err(|e| format!("Google Drive sync error: {}", e))?
         }
         p => Err(format!("Unknown provider: {}", p)),
     }?;
