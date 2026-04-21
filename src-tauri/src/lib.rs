@@ -62,7 +62,6 @@ fn ensure_schema(conn: &Connection) -> Result<(), String> {
             filename TEXT NOT NULL,
             encrypted_bytes TEXT NOT NULL
         );
-        PRAGMA foreign_keys = ON;
     ").map_err(|e| e.to_string())?;
     // Safe migration for DBs created before is_favorite existed
     let _ = conn.execute("ALTER TABLE items ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0", []);
@@ -71,7 +70,9 @@ fn ensure_schema(conn: &Connection) -> Result<(), String> {
 
 fn get_db_conn(state: &State<AppState>) -> Result<Connection, String> {
     let path = state.db_path.lock().unwrap().clone().ok_or("DB path not set")?;
-    Connection::open(path).map_err(|e| e.to_string())
+    let conn = Connection::open(path).map_err(|e| e.to_string())?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| e.to_string())?;
+    Ok(conn)
 }
 
 #[tauri::command]
@@ -247,7 +248,13 @@ fn add_item(state: State<AppState>, id: &str, category: &str, title: &str, usern
     
     let conn = get_db_conn(&state)?;
     conn.execute(
-        "INSERT OR REPLACE INTO items (id, category, title, username, encrypted_payload) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO items (id, category, title, username, encrypted_payload)
+VALUES (?1, ?2, ?3, ?4, ?5)
+ON CONFLICT(id) DO UPDATE SET
+    category = excluded.category,
+    title = excluded.title,
+    username = excluded.username,
+    encrypted_payload = excluded.encrypted_payload",
         params![id, enc_category, enc_title, enc_username, enc_payload],
     ).map_err(|e| e.to_string())?;
     
@@ -377,6 +384,9 @@ fn get_tags(state: State<AppState>) -> Result<Vec<(String, String)>, String> {
 
 #[tauri::command]
 fn create_tag(state: State<AppState>, id: &str, name: &str) -> Result<(), String> {
+    if !is_unlocked(state.clone()) {
+        return Err("Vault is locked".into());
+    }
     let conn = get_db_conn(&state)?;
     conn.execute(
         "INSERT OR IGNORE INTO tags (id, name) VALUES (?1, ?2)",
@@ -388,6 +398,9 @@ fn create_tag(state: State<AppState>, id: &str, name: &str) -> Result<(), String
 
 #[tauri::command]
 fn delete_tag(state: State<AppState>, id: &str) -> Result<(), String> {
+    if !is_unlocked(state.clone()) {
+        return Err("Vault is locked".into());
+    }
     let conn = get_db_conn(&state)?;
     conn.execute("DELETE FROM tags WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
@@ -420,21 +433,28 @@ fn set_item_tags(
     item_id: &str,
     tag_ids: Vec<String>,
 ) -> Result<(), String> {
-    let conn = get_db_conn(&state)?;
-    conn.execute("DELETE FROM item_tags WHERE item_id = ?1", params![item_id])
+    if !is_unlocked(state.clone()) {
+        return Err("Vault is locked".into());
+    }
+    let mut conn = get_db_conn(&state)?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM item_tags WHERE item_id = ?1", params![item_id])
         .map_err(|e| e.to_string())?;
-    for tag_id in tag_ids {
-        conn.execute(
+    for tag_id in &tag_ids {
+        tx.execute(
             "INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
             params![item_id, tag_id],
         )
         .map_err(|e| e.to_string())?;
     }
-    Ok(())
+    tx.commit().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn toggle_favorite(state: State<AppState>, id: &str) -> Result<bool, String> {
+    if !is_unlocked(state.clone()) {
+        return Err("Vault is locked".into());
+    }
     let conn = get_db_conn(&state)?;
     let current: i64 = conn
         .query_row(
@@ -460,6 +480,9 @@ fn add_attachment(
     filename: &str,
     data_b64: &str,
 ) -> Result<(), String> {
+    if !is_unlocked(state.clone()) {
+        return Err("Vault is locked".into());
+    }
     let encrypted = encrypt_data_internal(&state, data_b64)?;
     let conn = get_db_conn(&state)?;
     conn.execute(
@@ -504,6 +527,9 @@ fn get_attachment_data(state: State<AppState>, id: &str) -> Result<String, Strin
 
 #[tauri::command]
 fn delete_attachment(state: State<AppState>, id: &str) -> Result<(), String> {
+    if !is_unlocked(state.clone()) {
+        return Err("Vault is locked".into());
+    }
     let conn = get_db_conn(&state)?;
     conn.execute("DELETE FROM attachments WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
