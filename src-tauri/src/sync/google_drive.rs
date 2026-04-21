@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use tauri::State;
 
 use crate::{encrypt_data_with_key, AppState, GoogleOAuthState};
-use super::{SyncConfig, SyncProvider};
+use super::SyncProvider;
 
 // ─── Hier eigene Google Cloud OAuth2-Credentials eintragen ─────────────────
 const CLIENT_ID: &str = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
@@ -115,7 +115,7 @@ impl SyncProvider for GoogleDriveProvider {
             .query(&[
                 ("spaces", "appDataFolder"),
                 ("q", "name = 'vault.db'"),
-                ("fields", "files(id,md5Checksum)"),
+                ("fields", "files(id)"),
             ])
             .bearer_auth(&self.access_token)
             .send()
@@ -125,10 +125,24 @@ impl SyncProvider for GoogleDriveProvider {
         if files.is_empty() {
             return Ok(None);
         }
-        if let Some(id) = files[0]["id"].as_str() {
-            *self.file_id.lock().unwrap() = Some(id.to_string());
+        let file_id = files[0]["id"].as_str().ok_or("Keine Datei-ID in Drive-Antwort")?.to_string();
+        *self.file_id.lock().unwrap() = Some(file_id.clone());
+
+        // Download the remote file and compute SHA256 so the hash format matches
+        // what trigger_sync stores via local_hash() (also SHA256).
+        let data_resp = client
+            .get(&format!(
+                "https://www.googleapis.com/drive/v3/files/{}?alt=media",
+                file_id
+            ))
+            .bearer_auth(&self.access_token)
+            .send()
+            .map_err(|e| e.to_string())?;
+        if !data_resp.status().is_success() {
+            return Err(format!("remote_hash Download fehlgeschlagen: HTTP {}", data_resp.status()));
         }
-        Ok(files[0]["md5Checksum"].as_str().map(|s| s.to_string()))
+        let bytes = data_resp.bytes().map_err(|e| e.to_string())?;
+        Ok(Some(format!("{:x}", Sha256::digest(&bytes))))
     }
 
     fn upload(&self, vault_bytes: &[u8], _hash: &str) -> Result<(), String> {
