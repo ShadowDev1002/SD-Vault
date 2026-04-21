@@ -40,9 +40,13 @@ export function PasswordGenerator({ onClose }: PasswordGeneratorProps) {
     useEffect(() => { regenerate(); }, [regenerate]);
 
     async function handleCopy() {
-        await navigator.clipboard.writeText(result);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+        try {
+            await navigator.clipboard.writeText(result);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            // clipboard unavailable
+        }
     }
 
     function setPwOpt<K extends keyof GeneratePasswordOptions>(key: K, value: GeneratePasswordOptions[K]) {

@@ -20,6 +20,7 @@ const SYMBOLS = "!@#$%^&*()-_=+[]{}|;:,.<>?";
 
 // Gleichmäßige Zufallsverteilung ohne Modulo-Bias
 function randomIndex(max: number): number {
+    if (max <= 1) return 0;
     const limit = Math.floor(0x100000000 / max) * max;
     const buf = new Uint32Array(1);
     do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
