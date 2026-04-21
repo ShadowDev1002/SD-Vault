@@ -39,7 +39,7 @@ export function GoogleDriveSync() {
             const authUrl = await invoke<string>("start_google_oauth");
             await openUrl(authUrl);
             setStatus("Warte auf Browser-Bestätigung (max. 2 Minuten)...");
-            await invoke("complete_google_oauth");
+            await invoke<void>("complete_google_oauth");
             setIsConnected(true);
             setStatus("Erfolgreich verbunden!");
         } catch (err) {
@@ -72,7 +72,7 @@ export function GoogleDriveSync() {
     async function handleDisconnect() {
         if (!confirm("Google Drive Verbindung trennen?")) return;
         try {
-            await invoke("disconnect_google_drive");
+            await invoke<void>("disconnect_google_drive");
             setIsConnected(false);
             setStatus("");
             setLastSynced(null);
