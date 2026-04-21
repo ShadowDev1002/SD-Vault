@@ -44,7 +44,7 @@ pub fn derive_master_key(
 pub fn derive_sqlcipher_key(master_key: &[u8; KEY_LEN]) -> Zeroizing<[u8; KEY_LEN]> {
     let hk = Hkdf::<Sha256>::new(None, master_key);
     let mut okm = Zeroizing::new([0u8; KEY_LEN]);
-    hk.expand(b"sd-vault:sqlcipher:v1", okm.as_mut()).unwrap();
+    hk.expand(b"sd-vault:sqlcipher:v1", okm.as_mut()).expect("HKDF expand: output length 32 is always valid");
     okm
 }
 
@@ -52,7 +52,7 @@ pub fn derive_sqlcipher_key(master_key: &[u8; KEY_LEN]) -> Zeroizing<[u8; KEY_LE
 pub fn derive_entry_key(master_key: &[u8; KEY_LEN]) -> Zeroizing<[u8; KEY_LEN]> {
     let hk = Hkdf::<Sha256>::new(None, master_key);
     let mut okm = Zeroizing::new([0u8; KEY_LEN]);
-    hk.expand(b"sd-vault:entries:v1", okm.as_mut()).unwrap();
+    hk.expand(b"sd-vault:entries:v1", okm.as_mut()).expect("HKDF expand: output length 32 is always valid");
     okm
 }
 
