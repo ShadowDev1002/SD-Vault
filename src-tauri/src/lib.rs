@@ -16,9 +16,11 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 use zeroize::Zeroizing;
 
-struct AppState {
-    master_key: Mutex<Option<Zeroizing<[u8; 32]>>>,
-    db_path: Mutex<Option<PathBuf>>,
+mod sync;
+
+pub(crate) struct AppState {
+    pub(crate) master_key: Mutex<Option<Zeroizing<[u8; 32]>>>,
+    pub(crate) db_path: Mutex<Option<PathBuf>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -62,6 +64,18 @@ fn ensure_schema(conn: &Connection) -> Result<(), String> {
             filename TEXT NOT NULL,
             encrypted_bytes TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS sync_config (
+            id TEXT PRIMARY KEY,
+            provider TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 0,
+            interval_secs INTEGER NOT NULL DEFAULT 300,
+            remote_url TEXT NOT NULL DEFAULT '',
+            remote_path TEXT NOT NULL DEFAULT '/vaultzero.db',
+            username TEXT NOT NULL DEFAULT '',
+            encrypted_credentials TEXT NOT NULL DEFAULT '',
+            last_synced_at INTEGER,
+            last_remote_hash TEXT
+        );
     ").map_err(|e| e.to_string())?;
     // Safe migration for DBs created before is_favorite existed
     let _ = conn.execute("ALTER TABLE items ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0", []);
@@ -73,6 +87,10 @@ fn get_db_conn(state: &State<AppState>) -> Result<Connection, String> {
     let conn = Connection::open(path).map_err(|e| e.to_string())?;
     conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| e.to_string())?;
     Ok(conn)
+}
+
+pub(crate) fn get_db_path_from_state(state: &State<AppState>) -> Result<std::path::PathBuf, String> {
+    state.db_path.lock().unwrap().clone().ok_or_else(|| "DB path not set".to_string())
 }
 
 #[tauri::command]
@@ -569,6 +587,11 @@ pub fn run() {
             get_attachments,
             get_attachment_data,
             delete_attachment,
+            sync::get_sync_configs,
+            sync::save_sync_config,
+            sync::delete_sync_config,
+            sync::trigger_sync,
+            sync::get_last_sync_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
