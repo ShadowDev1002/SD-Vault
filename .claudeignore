@@ -1,0 +1,14 @@
+node_modules/
+.git/
+dist/
+build/
+.next/
+out/
+coverage/
+__pycache__/
+.venv/
+*.pyc
+*.log
+*.lock
+.env
+.env.*
