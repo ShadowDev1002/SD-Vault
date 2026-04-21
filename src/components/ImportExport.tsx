@@ -7,6 +7,7 @@ export function ImportExport() {
     const [exportStatus, setExportStatus] = useState("");
     const [isExporting, setIsExporting] = useState(false);
 
+    const [sdpxFile, setSdpxFile] = useState<File | null>(null);
     const [sdpxPwd, setSdpxPwd] = useState("");
     const [importStatus, setImportStatus] = useState("");
     const [isImporting, setIsImporting] = useState(false);
@@ -41,7 +42,13 @@ export function ImportExport() {
     function handleSdpxFile(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (!sdpxPwd) { setImportStatus("Bitte zuerst das Export-Passwort eingeben."); return; }
+        setSdpxFile(file);
+        setSdpxPwd("");
+        setImportStatus("");
+    }
+
+    async function handleSdpxImport() {
+        if (!sdpxFile || !sdpxPwd) return;
         setIsImporting(true);
         setImportStatus("");
         const reader = new FileReader();
@@ -52,14 +59,15 @@ export function ImportExport() {
                 const count = await invoke<number>("import_sdpx", { dataBase64: b64, password: sdpxPwd });
                 setImportStatus(`${count} Einträge importiert.`);
                 setSdpxPwd("");
+                setSdpxFile(null);
+                if (sdpxRef.current) sdpxRef.current.value = "";
             } catch (err) {
                 setImportStatus(`Fehler: ${err}`);
             } finally {
                 setIsImporting(false);
-                if (sdpxRef.current) sdpxRef.current.value = "";
             }
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(sdpxFile);
     }
 
     function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -128,12 +136,9 @@ export function ImportExport() {
                 <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px", lineHeight: 1.5 }}>
                     Einträge importieren aus .sdpx-Datei oder Bitwarden CSV.
                 </p>
-                <label style={labelStyle}>EXPORT-PASSWORT FÜR .SDPX</label>
-                <input type="password" value={sdpxPwd} onChange={e => setSdpxPwd(e.target.value)}
-                    placeholder="Passwort der .sdpx-Datei" style={inputStyle} />
                 <div style={{ display: "flex", gap: "12px" }}>
                     <label style={{ ...btnStyle, flex: 1, textAlign: "center", cursor: isImporting ? "not-allowed" : "pointer", opacity: isImporting ? 0.5 : 1 }}>
-                        SD-Passwort (.sdpx)
+                        {sdpxFile ? sdpxFile.name : "SD-Passwort (.sdpx)"}
                         <input ref={sdpxRef} type="file" accept=".sdpx" onChange={handleSdpxFile}
                             disabled={isImporting} style={{ display: "none" }} />
                     </label>
@@ -143,6 +148,17 @@ export function ImportExport() {
                             disabled={isImporting} style={{ display: "none" }} />
                     </label>
                 </div>
+                {sdpxFile && (
+                    <div style={{ marginTop: "12px" }}>
+                        <label style={labelStyle}>EXPORT-PASSWORT FÜR .SDPX</label>
+                        <input type="password" value={sdpxPwd} onChange={e => setSdpxPwd(e.target.value)}
+                            placeholder="Passwort der .sdpx-Datei" style={inputStyle} />
+                        <button onClick={handleSdpxImport} disabled={isImporting || !sdpxPwd}
+                            style={{ ...btnStyle, background: "var(--accent-blue)", border: "none", width: "100%", opacity: !sdpxPwd ? 0.5 : 1 }}>
+                            {isImporting ? "Importiere..." : "Importieren"}
+                        </button>
+                    </div>
+                )}
                 {importStatus && (
                     <p style={{ fontSize: "12px", marginTop: "8px", color: importStatus.startsWith("Fehler") ? "var(--danger)" : "#4CD964" }}>
                         {importStatus}
