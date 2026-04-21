@@ -26,10 +26,12 @@ export function ImportExport() {
             const bytes = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
             const blob = new Blob([bytes], { type: "application/octet-stream" });
+            const url = URL.createObjectURL(blob);
             const el = document.createElement("a");
-            el.href = URL.createObjectURL(blob);
+            el.href = url;
             el.download = `SD_Passwort_Export_${new Date().toISOString().slice(0,10)}.sdpx`;
             document.body.appendChild(el); el.click(); document.body.removeChild(el);
+            URL.revokeObjectURL(url);
             setExportStatus("Export erfolgreich!");
             setExportPwd(""); setExportPwdConfirm("");
         } catch (err) {
@@ -63,6 +65,7 @@ export function ImportExport() {
                 if (sdpxRef.current) sdpxRef.current.value = "";
             } catch (err) {
                 setImportStatus(`Fehler: ${err}`);
+                setSdpxPwd("");
             } finally {
                 setIsImporting(false);
             }
@@ -71,6 +74,7 @@ export function ImportExport() {
     }
 
     function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
+        if (isImporting) return;
         const file = e.target.files?.[0];
         if (!file) return;
         if (!confirm("Bitwarden CSV ist unverschlüsselt. Bitte die Datei nach dem Import löschen. Fortfahren?")) return;
