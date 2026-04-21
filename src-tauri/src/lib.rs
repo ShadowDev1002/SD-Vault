@@ -17,6 +17,7 @@ use tauri::{AppHandle, Manager, State};
 use zeroize::Zeroizing;
 
 mod sync;
+mod import_export;
 
 pub(crate) struct AppState {
     pub(crate) master_key: Mutex<Option<Zeroizing<[u8; 32]>>>,
@@ -592,6 +593,9 @@ pub fn run() {
             sync::delete_sync_config,
             sync::trigger_sync,
             sync::get_last_sync_status,
+            import_export::export_items,
+            import_export::import_sdpx,
+            import_export::import_bitwarden_csv,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
