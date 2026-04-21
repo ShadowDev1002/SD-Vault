@@ -28,4 +28,5 @@ rand_core = "0.10.1"
 rusqlite = { version = "0.39.0", features = ["bundled"] }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 hex = "0.4.3"
+base64 = "0.22"
 
