@@ -14,6 +14,7 @@ export default function App() {
     const [meta, setMeta] = useState<VaultMeta | null>(null);
     const [showSettings, setShowSettings] = useState(false);
     const [lockTimeout, setLockTimeout] = useState(5);
+    const [hasUpdate, setHasUpdate] = useState(false);
     const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
@@ -61,6 +62,7 @@ export default function App() {
                     meta={meta}
                     onLocked={handleLocked}
                     onSettings={() => setShowSettings(true)}
+                    hasUpdate={hasUpdate}
                 />
             )}
             {showSettings && (
@@ -69,6 +71,7 @@ export default function App() {
                     lockTimeout={lockTimeout}
                     onTimeoutChange={setLockTimeout}
                     onClose={() => setShowSettings(false)}
+                    onUpdateFound={() => setHasUpdate(true)}
                 />
             )}
         </>

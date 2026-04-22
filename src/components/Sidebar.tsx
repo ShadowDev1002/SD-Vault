@@ -1,4 +1,7 @@
+import logoUrl from '../assets/logo.svg';
 import type { Category } from '../types';
+
+export const APP_VERSION = '0.1.0';
 
 interface Props {
     activeCategory: Category | 'all';
@@ -7,23 +10,39 @@ interface Props {
     onSearchChange: (s: string) => void;
     onLock: () => void;
     onSettings: () => void;
+    hasUpdate?: boolean;
 }
 
-const CATEGORIES: { key: Category | 'all'; label: string; icon: string }[] = [
-    { key: 'all', label: 'Alle Einträge', icon: '📋' },
-    { key: 'login', label: 'Logins', icon: '🔑' },
-    { key: 'card', label: 'Karten', icon: '💳' },
-    { key: 'note', label: 'Notizen', icon: '📝' },
-    { key: 'identity', label: 'Identitäten', icon: '👤' },
+const CATEGORIES: { key: Category | 'all'; label: string; icon: JSX.Element }[] = [
+    { key: 'all',      label: 'Alle Einträge', icon: <AllIcon /> },
+    { key: 'login',    label: 'Logins',        icon: <KeyIcon /> },
+    { key: 'card',     label: 'Karten',        icon: <CardIcon /> },
+    { key: 'note',     label: 'Notizen',       icon: <NoteIcon /> },
+    { key: 'identity', label: 'Identitäten',   icon: <UserIcon /> },
 ];
 
-export default function Sidebar({ activeCategory, onCategoryChange, search, onSearchChange, onLock, onSettings }: Props) {
+export default function Sidebar({ activeCategory, onCategoryChange, search, onSearchChange, onLock, onSettings, hasUpdate }: Props) {
     return (
         <aside className="flex flex-col h-full w-56 border-r shrink-0" style={{ backgroundColor: 'var(--vault-surface)', borderColor: 'var(--vault-border)' }}>
-            <div className="p-4 border-b" style={{ borderColor: 'var(--vault-border)' }}>
-                <h1 className="text-sm font-bold text-white">🔒 SD-Vault</h1>
+            {/* Logo + version */}
+            <div className="px-4 py-4 border-b" style={{ borderColor: 'var(--vault-border)' }}>
+                <div className="flex items-center gap-2.5">
+                    <img src={logoUrl} alt="SD-Vault" className="w-7 h-7 shrink-0" />
+                    <div>
+                        <span className="text-sm font-bold text-white tracking-wide">SD-Vault</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-xs" style={{ color: 'var(--vault-muted)' }}>v{APP_VERSION}</span>
+                            {hasUpdate && (
+                                <span className="px-1.5 py-px rounded text-xs font-medium" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                                    Update
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            {/* Search */}
             <div className="p-3">
                 <input
                     type="text"
@@ -35,6 +54,7 @@ export default function Sidebar({ activeCategory, onCategoryChange, search, onSe
                 />
             </div>
 
+            {/* Navigation */}
             <nav className="flex-1 px-2 space-y-0.5">
                 {CATEGORIES.map(({ key, label, icon }) => (
                     <button
@@ -42,32 +62,99 @@ export default function Sidebar({ activeCategory, onCategoryChange, search, onSe
                         onClick={() => onCategoryChange(key)}
                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-colors"
                         style={{
-                            backgroundColor: activeCategory === key ? 'var(--vault-accent)' : 'transparent',
+                            backgroundColor: activeCategory === key ? 'rgba(99,102,241,0.18)' : 'transparent',
                             color: activeCategory === key ? 'white' : 'var(--vault-muted)',
                         }}
                     >
-                        <span>{icon}</span>
+                        <span className="w-4 h-4 shrink-0" style={{ color: activeCategory === key ? '#818cf8' : undefined }}>
+                            {icon}
+                        </span>
                         <span>{label}</span>
                     </button>
                 ))}
             </nav>
 
-            <div className="p-3 border-t flex gap-2" style={{ borderColor: 'var(--vault-border)' }}>
+            {/* Bottom actions */}
+            <div className="p-3 border-t space-y-1.5" style={{ borderColor: 'var(--vault-border)' }}>
                 <button
                     onClick={onSettings}
-                    className="flex-1 py-1.5 text-xs rounded-lg border transition-colors"
-                    style={{ borderColor: 'var(--vault-border)', color: 'var(--vault-muted)' }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+                    style={{ color: 'var(--vault-muted)' }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)')}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                    ⚙️ Einstellungen
+                    <SettingsIcon />
+                    <span>Einstellungen</span>
+                    {hasUpdate && <span className="ml-auto w-2 h-2 rounded-full" style={{ backgroundColor: '#3b82f6' }} />}
                 </button>
                 <button
                     onClick={onLock}
-                    className="flex-1 py-1.5 text-xs rounded-lg border transition-colors"
-                    style={{ borderColor: 'var(--vault-border)', color: 'var(--vault-muted)' }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+                    style={{ color: 'var(--vault-muted)' }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)')}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                    🔒 Sperren
+                    <LockIcon />
+                    <span>Sperren</span>
                 </button>
             </div>
         </aside>
+    );
+}
+
+function AllIcon() {
+    return (
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="1" y="1" width="6" height="6" rx="1" /><rect x="9" y="1" width="6" height="6" rx="1" />
+            <rect x="1" y="9" width="6" height="6" rx="1" /><rect x="9" y="9" width="6" height="6" rx="1" />
+        </svg>
+    );
+}
+function KeyIcon() {
+    return (
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="6" cy="8" r="4" />
+            <path d="M10 8h5M13 6v4" strokeLinecap="round" />
+        </svg>
+    );
+}
+function CardIcon() {
+    return (
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="1" y="3" width="14" height="10" rx="1.5" />
+            <path d="M1 6h14" strokeLinecap="round" />
+        </svg>
+    );
+}
+function NoteIcon() {
+    return (
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="2" y="1" width="12" height="14" rx="1.5" />
+            <path d="M5 5h6M5 8h6M5 11h4" strokeLinecap="round" />
+        </svg>
+    );
+}
+function UserIcon() {
+    return (
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="8" cy="5" r="3" />
+            <path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" strokeLinecap="round" />
+        </svg>
+    );
+}
+function SettingsIcon() {
+    return (
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="8" cy="8" r="2" />
+            <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" strokeLinecap="round" />
+        </svg>
+    );
+}
+function LockIcon() {
+    return (
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="7" width="10" height="8" rx="1.5" />
+            <path d="M5 7V5a3 3 0 016 0v2" strokeLinecap="round" />
+        </svg>
     );
 }

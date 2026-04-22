@@ -268,3 +268,8 @@ pub async fn list_local_backups(state: State<'_, AppState>) -> Result<Vec<Backup
     let vault_dir = state.vault_dir.lock().unwrap().clone().ok_or("Vault ist gesperrt")?;
     LocalBackupProvider::new(&vault_dir)?.list_backups().await
 }
+
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    open::that_detached(&url).map_err(|e| e.to_string())
+}

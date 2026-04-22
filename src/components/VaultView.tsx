@@ -9,9 +9,10 @@ interface Props {
     meta: VaultMeta;
     onLocked: () => void;
     onSettings: () => void;
+    hasUpdate?: boolean;
 }
 
-export default function VaultView({ meta: _meta, onLocked, onSettings }: Props) {
+export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate }: Props) {
     const [items, setItems] = useState<Item[]>([]);
     const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
     const [search, setSearch] = useState('');
@@ -67,6 +68,7 @@ export default function VaultView({ meta: _meta, onLocked, onSettings }: Props) 
                 onSearchChange={setSearch}
                 onLock={handleLock}
                 onSettings={onSettings}
+                hasUpdate={hasUpdate}
             />
             <EntryList
                 items={filtered}

@@ -160,6 +160,7 @@ pub fn run() {
             commands::save_sftp_config,
             commands::list_local_backups,
             commands::reset_master_password,
+            commands::open_url,
         ])
         .run(tauri::generate_context!())
         .expect("SD-Vault konnte nicht gestartet werden");
