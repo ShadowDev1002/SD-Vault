@@ -1,20 +1,24 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "SD-Passwort",
+  "productName": "SD-Vault",
   "version": "0.1.0",
-  "identifier": "com.sdpasswort.app",
+  "identifier": "de.shadowdev.sd-vault",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist"
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
   },
   "app": {
     "windows": [
       {
-        "title": "SD-Passwort",
-        "width": 800,
-        "height": 600
+        "title": "SD-Vault",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
       }
     ],
     "security": {

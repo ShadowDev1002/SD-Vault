@@ -1,57 +1,66 @@
-import { Plus, Search, Star } from "lucide-react";
-import type { PasswordItem, FilterCategory } from "../types";
-import { getAvatarColor, CATEGORIES } from "../types";
+import type { Item, Category } from '../types';
 
-interface EntryListProps {
-    items: PasswordItem[];
+interface Props {
+    items: Item[];
     selectedId: string | null;
-    selectedCategory: FilterCategory;
-    searchQuery: string;
-    onSearchChange: (q: string) => void;
-    onSelectItem: (item: PasswordItem) => void;
-    onNewItem: () => void;
+    onSelect: (id: string) => void;
+    onAdd: () => void;
 }
 
-export function EntryList({ items, selectedId, selectedCategory, searchQuery, onSearchChange, onSelectItem, onNewItem }: EntryListProps) {
-    const filtered = items.filter(item => {
-        const s = searchQuery.toLowerCase();
-        const matchesSearch = item.title.toLowerCase().includes(s) || item.username.toLowerCase().includes(s);
-        if (!matchesSearch) return false;
-        if (selectedCategory === 'all') return true;
-        if (selectedCategory === 'favorites') return item.is_favorite;
-        return item.category === selectedCategory;
-    });
+function formatDate(ts: number): string {
+    return new Date(ts * 1000).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
+const CATEGORY_ICON: Record<Category, string> = {
+    login: '🔑',
+    card: '💳',
+    note: '📝',
+    identity: '👤',
+};
+
+export default function EntryList({ items, selectedId, onSelect, onAdd }: Props) {
     return (
-        <div className="item-list-pane">
-            <div className="list-toolbar">
-                <div className="search-box">
-                    <Search size={14} color="var(--text-secondary)" />
-                    <input placeholder="Suchen" value={searchQuery} onChange={e => onSearchChange(e.target.value)} />
-                </div>
-                <button className="icon-btn" onClick={onNewItem} style={{ background: 'var(--accent-blue)', color: 'white' }}>
-                    <Plus size={16} />
+        <div className="flex flex-col h-full w-64 border-r shrink-0" style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--vault-border)' }}>
+                <span className="text-sm font-medium text-gray-400">{items.length} Einträge</span>
+                <button
+                    onClick={onAdd}
+                    className="text-xs px-3 py-1 rounded-lg font-medium text-white"
+                    style={{ backgroundColor: 'var(--vault-accent)' }}
+                >
+                    + Neu
                 </button>
             </div>
-            <div className="items-scroll">
-                {filtered.map(item => (
-                    <div key={item.id} className={`list-item ${selectedId === item.id ? 'selected' : ''}`} onClick={() => onSelectItem(item)}>
-                        <div className="item-avatar" style={{ backgroundColor: getAvatarColor(item.title) }}>
-                            {item.title.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="list-item-details">
-                            <div className="list-item-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                {item.title}
-                                {item.is_favorite && (
-                                    <Star size={11} fill="#FFCC00" color="#FFCC00" />
-                                )}
-                            </div>
-                            <div className="list-item-subtitle">
-                                {item.username || CATEGORIES.find(c => c.id === item.category)?.label}
-                            </div>
-                        </div>
+
+            <div className="flex-1 overflow-y-auto">
+                {items.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                        <p className="text-sm" style={{ color: 'var(--vault-muted)' }}>Keine Einträge</p>
+                        <button onClick={onAdd} className="mt-3 text-xs underline" style={{ color: 'var(--vault-accent)' }}>
+                            Ersten Eintrag erstellen
+                        </button>
                     </div>
-                ))}
+                ) : (
+                    items.map(item => (
+                        <button
+                            key={item.id}
+                            onClick={() => onSelect(item.id)}
+                            className="w-full px-4 py-3 text-left border-b flex items-start gap-3 transition-colors"
+                            style={{
+                                borderColor: 'var(--vault-border)',
+                                backgroundColor: selectedId === item.id ? 'var(--vault-surface)' : 'transparent',
+                            }}
+                        >
+                            <span className="text-lg mt-0.5">{CATEGORY_ICON[item.category]}</span>
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium text-white truncate">{item.payload.title || '(Kein Titel)'}</p>
+                                <p className="text-xs truncate mt-0.5" style={{ color: 'var(--vault-muted)' }}>
+                                    {item.payload.username || item.payload.url || formatDate(item.updated_at)}
+                                </p>
+                            </div>
+                        </button>
+                    ))
+                )}
             </div>
         </div>
     );

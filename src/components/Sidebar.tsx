@@ -1,61 +1,73 @@
-import { Shield, KeyRound, CreditCard, FileText, Code, StickyNote, Smartphone, Database, Star } from "lucide-react";
-import type { FilterCategory } from "../types";
+import type { Category } from '../types';
 
-const NAV_ITEMS: { id: FilterCategory; label: string; Icon: React.ElementType }[] = [
-    { id: 'all', label: 'Alle Objekte', Icon: Database },
-    { id: 'favorites', label: 'Favoriten', Icon: Star },
-    { id: 'login', label: 'Anmeldedaten', Icon: KeyRound },
-    { id: 'finance', label: 'Kreditkarten', Icon: CreditCard },
-    { id: 'document', label: 'Dokumente', Icon: FileText },
-    { id: 'totp', label: 'Einmalpasswörter', Icon: Smartphone },
-    { id: 'tech', label: 'Tech-Geheimnisse', Icon: Code },
-    { id: 'note', label: 'Sichere Notizen', Icon: StickyNote },
-];
-
-interface SidebarProps {
-    selectedCategory: FilterCategory;
-    onCategoryChange: (cat: FilterCategory) => void;
-    onSettings: () => void;
-    onSync: () => void;
-    onGenerator: () => void;
+interface Props {
+    activeCategory: Category | 'all';
+    onCategoryChange: (cat: Category | 'all') => void;
+    search: string;
+    onSearchChange: (s: string) => void;
     onLock: () => void;
+    onSettings: () => void;
 }
 
-export function Sidebar({ selectedCategory, onCategoryChange, onSettings, onSync, onGenerator, onLock }: SidebarProps) {
+const CATEGORIES: { key: Category | 'all'; label: string; icon: string }[] = [
+    { key: 'all', label: 'Alle Einträge', icon: '📋' },
+    { key: 'login', label: 'Logins', icon: '🔑' },
+    { key: 'card', label: 'Karten', icon: '💳' },
+    { key: 'note', label: 'Notizen', icon: '📝' },
+    { key: 'identity', label: 'Identitäten', icon: '👤' },
+];
+
+export default function Sidebar({ activeCategory, onCategoryChange, search, onSearchChange, onLock, onSettings }: Props) {
     return (
-        <div className="sidebar">
-            <div className="sidebar-header">
-                <Shield size={22} color="var(--accent-blue)" />
-                <h2>SD-Passwort</h2>
+        <aside className="flex flex-col h-full w-56 border-r shrink-0" style={{ backgroundColor: 'var(--vault-surface)', borderColor: 'var(--vault-border)' }}>
+            <div className="p-4 border-b" style={{ borderColor: 'var(--vault-border)' }}>
+                <h1 className="text-sm font-bold text-white">🔒 SD-Vault</h1>
             </div>
 
-            <div className="sidebar-nav">
-                <div className="sidebar-section-title">Tresor</div>
-                {NAV_ITEMS.slice(0, 2).map(({ id, label, Icon }) => (
-                    <div key={id} className={`nav-item ${selectedCategory === id ? 'active' : ''}`} onClick={() => onCategoryChange(id)}>
-                        <Icon size={16} /> {label}
-                    </div>
-                ))}
-                <div className="sidebar-section-title" style={{ marginTop: '16px' }}>Kategorien</div>
-                {NAV_ITEMS.slice(2).map(({ id, label, Icon }) => (
-                    <div key={id} className={`nav-item ${selectedCategory === id ? 'active' : ''}`} onClick={() => onCategoryChange(id)}>
-                        <Icon size={16} /> {label}
-                    </div>
-                ))}
+            <div className="p-3">
+                <input
+                    type="text"
+                    value={search}
+                    onChange={e => onSearchChange(e.target.value)}
+                    placeholder="Suchen..."
+                    className="w-full px-3 py-1.5 text-sm rounded-lg border text-white focus:outline-none"
+                    style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }}
+                />
             </div>
 
-            <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button className="lock-btn" onClick={onSettings} style={{ background: 'transparent', color: 'var(--text-secondary)' }}>
-                    Einstellungen
+            <nav className="flex-1 px-2 space-y-0.5">
+                {CATEGORIES.map(({ key, label, icon }) => (
+                    <button
+                        key={key}
+                        onClick={() => onCategoryChange(key)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-colors"
+                        style={{
+                            backgroundColor: activeCategory === key ? 'var(--vault-accent)' : 'transparent',
+                            color: activeCategory === key ? 'white' : 'var(--vault-muted)',
+                        }}
+                    >
+                        <span>{icon}</span>
+                        <span>{label}</span>
+                    </button>
+                ))}
+            </nav>
+
+            <div className="p-3 border-t flex gap-2" style={{ borderColor: 'var(--vault-border)' }}>
+                <button
+                    onClick={onSettings}
+                    className="flex-1 py-1.5 text-xs rounded-lg border transition-colors"
+                    style={{ borderColor: 'var(--vault-border)', color: 'var(--vault-muted)' }}
+                >
+                    ⚙️ Einstellungen
                 </button>
-                <button className="lock-btn" onClick={onSync} style={{ background: 'transparent', color: 'var(--text-secondary)' }}>
-                    Sync
+                <button
+                    onClick={onLock}
+                    className="flex-1 py-1.5 text-xs rounded-lg border transition-colors"
+                    style={{ borderColor: 'var(--vault-border)', color: 'var(--vault-muted)' }}
+                >
+                    🔒 Sperren
                 </button>
-                <button className="lock-btn" onClick={onGenerator} style={{ background: 'transparent', color: 'var(--text-secondary)' }}>
-                    Generator
-                </button>
-                <button className="lock-btn" onClick={onLock}>Tresor sperren</button>
             </div>
-        </div>
+        </aside>
     );
 }
