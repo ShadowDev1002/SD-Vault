@@ -11,16 +11,31 @@ use sha2::Sha256;
 use zeroize::Zeroizing;
 
 pub const KEY_LEN: usize = 32;
-pub const ARGON2_MEM_KB: u32 = 256 * 1024; // 256 MB
-pub const ARGON2_OPS: u32 = 3;
 pub const ARGON2_THREADS: u32 = 4;
+
+// Debug: schnelle Parameter für Entwicklung (~0.5s)
+// Release: sichere Parameter für Produktion (~3s)
+#[cfg(debug_assertions)]
+pub const ARGON2_MEM_KB: u32 = 32 * 1024; // 32 MB
+#[cfg(debug_assertions)]
+pub const ARGON2_OPS: u32 = 1;
+
+#[cfg(not(debug_assertions))]
+pub const ARGON2_MEM_KB: u32 = 256 * 1024; // 256 MB
+#[cfg(not(debug_assertions))]
+pub const ARGON2_OPS: u32 = 3;
 
 /// Leitet einen 32-Byte Master Key ab aus: Master-Passwort + Secret Key (via BLAKE3) → Argon2id.
 /// `salt` muss in vault.salt neben der DB gespeichert werden (Bootstrap-Lösung).
+/// mem_kb/ops/threads werden aus vault.kdf gelesen, damit debug- und release-Vaults
+/// kompatibel bleiben.
 pub fn derive_master_key(
     master_pw: &str,
     secret_key_bytes: &[u8],
     salt: &[u8; 32],
+    mem_kb: u32,
+    ops: u32,
+    threads: u32,
 ) -> Result<Zeroizing<[u8; KEY_LEN]>, String> {
     let mut hasher = Hasher::new();
     hasher.update(master_pw.as_bytes());
@@ -28,7 +43,7 @@ pub fn derive_master_key(
     hasher.update(secret_key_bytes);
     let combined = hasher.finalize();
 
-    let params = Params::new(ARGON2_MEM_KB, ARGON2_OPS, ARGON2_THREADS, Some(KEY_LEN))
+    let params = Params::new(mem_kb, ops, threads, Some(KEY_LEN))
         .map_err(|e| e.to_string())?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
 

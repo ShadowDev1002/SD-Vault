@@ -10,7 +10,8 @@ use crate::sync::local::LocalBackupProvider;
 use crate::sync::sftp::SftpProvider;
 use crate::sync::{BackupEntry, SyncProvider};
 
-use super::{get_vault_dir, db_path, write_salt, read_salt, write_secret_key, read_secret_key, write_recovery_wrap, read_recovery_wrap};
+use super::{get_vault_dir, db_path, write_salt, read_salt, write_secret_key, read_secret_key,
+            write_recovery_wrap, read_recovery_wrap, write_kdf_params, read_kdf_params, KdfParams};
 
 #[tauri::command]
 pub fn vault_exists() -> bool {
@@ -26,7 +27,7 @@ pub struct CreateVaultResult {
 }
 
 #[tauri::command]
-pub fn create_vault(
+pub async fn create_vault(
     state: State<'_, AppState>,
     master_pw: String,
 ) -> Result<CreateVaultResult, String> {
@@ -40,11 +41,22 @@ pub fn create_vault(
     write_salt(&salt)?;
     write_secret_key(&secret_key_bytes)?;
 
-    let master_key = crate::crypto::derive_master_key(&master_pw, &secret_key_bytes, &salt)?;
-    let sqlcipher_key = crate::crypto::derive_sqlcipher_key(&master_key);
-    let conn = crate::db::open_db(&db_path, &sqlcipher_key)?;
+    let kdf = KdfParams {
+        mem_kb:  crate::crypto::ARGON2_MEM_KB,
+        ops:     crate::crypto::ARGON2_OPS,
+        threads: crate::crypto::ARGON2_THREADS,
+    };
+    write_kdf_params(&kdf)?;
 
-    // Recovery wrap: ermöglicht Passwort-Reset via Secret Key
+    // Argon2id auf Blocking-Thread — blockiert nicht den UI-Thread
+    let master_key = tokio::task::spawn_blocking(move || {
+        crate::crypto::derive_master_key(&master_pw, &secret_key_bytes, &salt,
+                                         kdf.mem_kb, kdf.ops, kdf.threads)
+    }).await.map_err(|e| e.to_string())??;
+
+    let sqlcipher_key = crate::crypto::derive_sqlcipher_key(&*master_key);
+    let conn = crate::db::open_db(&db_path, &*sqlcipher_key)?;
+
     let recovery_key = crate::crypto::derive_recovery_key(&secret_key_bytes);
     let wrapped = crate::crypto::wrap_key(&recovery_key, &*master_key)?;
     write_recovery_wrap(&wrapped)?;
@@ -73,7 +85,7 @@ pub fn create_vault(
 }
 
 #[tauri::command]
-pub fn unlock_vault(
+pub async fn unlock_vault(
     state: State<'_, AppState>,
     master_pw: String,
 ) -> Result<VaultMeta, String> {
@@ -84,13 +96,19 @@ pub fn unlock_vault(
 
     let secret_key_bytes = read_secret_key()?;
     let salt = read_salt()?;
-    let master_key = crate::crypto::derive_master_key(&master_pw, &secret_key_bytes, &salt)?;
+    let kdf = read_kdf_params();
 
-    let sqlcipher_key = crate::crypto::derive_sqlcipher_key(&master_key);
-    let conn = crate::db::open_db(&db_path, &sqlcipher_key)?;
+    // Argon2id auf Blocking-Thread
+    let master_key = tokio::task::spawn_blocking(move || {
+        crate::crypto::derive_master_key(&master_pw, &secret_key_bytes, &salt,
+                                         kdf.mem_kb, kdf.ops, kdf.threads)
+    }).await.map_err(|e| e.to_string())??;
+
+    let sqlcipher_key = crate::crypto::derive_sqlcipher_key(&*master_key);
+    let conn = crate::db::open_db(&db_path, &*sqlcipher_key)?;
     let meta = crate::db::read_vault_meta(&conn)?;
 
-    // Migration: Recovery-Datei nachträglich erstellen falls noch nicht vorhanden
+    // Migration: Recovery-Datei erstellen falls noch nicht vorhanden
     if !super::recovery_path()?.exists() {
         let sk = read_secret_key()?;
         let recovery_key = crate::crypto::derive_recovery_key(&sk);
@@ -106,39 +124,39 @@ pub fn unlock_vault(
 }
 
 #[tauri::command]
-pub fn reset_master_password(
+pub async fn reset_master_password(
     secret_key_formatted: String,
     new_master_pw: String,
 ) -> Result<(), String> {
-    // 1. Secret Key verifizieren
     let provided_bytes = crate::crypto::parse_secret_key(&secret_key_formatted)?;
     let stored_bytes = read_secret_key()?;
     if provided_bytes != stored_bytes {
         return Err("Ungültiger Secret Key — stimmt nicht mit diesem Vault überein".into());
     }
 
-    // 2. Recovery Key ableiten und alten Master Key entschlüsseln
     let recovery_key = crate::crypto::derive_recovery_key(&stored_bytes);
     let wrapped = read_recovery_wrap()?;
     let old_master_key = crate::crypto::unwrap_key(&recovery_key, &wrapped)?;
 
-    // 3. Alten SQLCipher Key ableiten, DB öffnen
     let old_sqlcipher_key = crate::crypto::derive_sqlcipher_key(&*old_master_key);
     let db_path = db_path()?;
     let conn = crate::db::open_db(&db_path, &*old_sqlcipher_key)?;
 
-    // 4. Neuen Master Key mit neuem Passwort ableiten
     let new_salt = crate::crypto::generate_salt();
-    let new_master_key = crate::crypto::derive_master_key(&new_master_pw, &stored_bytes, &new_salt)?;
-    let new_sqlcipher_key = crate::crypto::derive_sqlcipher_key(&*new_master_key);
+    let kdf = read_kdf_params();
 
-    // 5. DB in-place re-verschlüsseln
+    // Neuer Master Key auf Blocking-Thread
+    let new_master_key = tokio::task::spawn_blocking(move || {
+        crate::crypto::derive_master_key(&new_master_pw, &stored_bytes, &new_salt,
+                                         kdf.mem_kb, kdf.ops, kdf.threads)
+    }).await.map_err(|e| e.to_string())??;
+
+    let new_sqlcipher_key = crate::crypto::derive_sqlcipher_key(&*new_master_key);
     conn.execute_batch(&format!(
         "PRAGMA rekey = \"x'{}'\";",
         hex::encode(new_sqlcipher_key.as_ref())
     )).map_err(|e| format!("Rekey fehlgeschlagen: {}", e))?;
 
-    // 6. Neue Salt und neuen Recovery Wrap speichern
     write_salt(&new_salt)?;
     let new_wrapped = crate::crypto::wrap_key(&recovery_key, &*new_master_key)?;
     write_recovery_wrap(&new_wrapped)?;

@@ -60,6 +60,44 @@ pub(crate) fn secret_key_path() -> Result<PathBuf, String> {
     Ok(get_vault_dir()?.join("vault.secret"))
 }
 
+pub(crate) fn kdf_params_path() -> Result<PathBuf, String> {
+    Ok(get_vault_dir()?.join("vault.kdf"))
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct KdfParams {
+    pub mem_kb: u32,
+    pub ops: u32,
+    pub threads: u32,
+}
+
+pub(crate) fn write_kdf_params(p: &KdfParams) -> Result<(), String> {
+    let mut b = Vec::with_capacity(12);
+    b.extend_from_slice(&p.mem_kb.to_le_bytes());
+    b.extend_from_slice(&p.ops.to_le_bytes());
+    b.extend_from_slice(&p.threads.to_le_bytes());
+    fs::write(kdf_params_path()?, b).map_err(|e| e.to_string())
+}
+
+pub(crate) fn read_kdf_params() -> KdfParams {
+    if let Ok(path) = kdf_params_path() {
+        if let Ok(b) = fs::read(path) {
+            if b.len() >= 12 {
+                return KdfParams {
+                    mem_kb: u32::from_le_bytes(b[0..4].try_into().unwrap()),
+                    ops:    u32::from_le_bytes(b[4..8].try_into().unwrap()),
+                    threads: u32::from_le_bytes(b[8..12].try_into().unwrap()),
+                };
+            }
+        }
+    }
+    KdfParams {
+        mem_kb:  crate::crypto::ARGON2_MEM_KB,
+        ops:     crate::crypto::ARGON2_OPS,
+        threads: crate::crypto::ARGON2_THREADS,
+    }
+}
+
 pub(crate) fn recovery_path() -> Result<PathBuf, String> {
     Ok(get_vault_dir()?.join("vault.recovery"))
 }
