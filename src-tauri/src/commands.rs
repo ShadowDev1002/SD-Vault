@@ -1,4 +1,5 @@
-use chrono::Utc;
+use chrono::{Datelike, Utc};
+use zeroize::Zeroize;
 use crate::db::{ItemPayload, ItemWithPayload, VaultMeta};
 use crate::AppState;
 use std::fs;
@@ -46,7 +47,10 @@ pub fn create_vault(
     crate::db::init_vault_meta(&conn, &vault_id, &salt)?;
 
     let now = Utc::now();
-    let created_at_formatted = now.format("%d. %B %Y").to_string();
+    let de_months = ["Januar","Februar","März","April","Mai","Juni",
+                     "Juli","August","September","Oktober","November","Dezember"];
+    let month = de_months[(now.month0()) as usize];
+    let created_at_formatted = format!("{}. {} {}", now.day(), month, now.year());
     let pdf_bytes =
         crate::emergency_kit::generate_pdf(&vault_id, &secret_key_formatted, &created_at_formatted)?;
 
@@ -91,10 +95,16 @@ pub fn unlock_vault(
 #[tauri::command]
 pub fn lock_vault(state: State<'_, AppState>) {
     if let Ok(mut k) = state.master_key.lock() {
-        k.take();
+        if let Some(ref mut key) = *k {
+            key.zeroize();
+        }
+        *k = None;
     }
     if let Ok(mut c) = state.db_conn.lock() {
         c.take();
+    }
+    if let Ok(mut d) = state.vault_dir.lock() {
+        d.take();
     }
 }
 
