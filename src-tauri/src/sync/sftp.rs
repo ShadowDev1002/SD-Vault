@@ -85,6 +85,13 @@ fn check_host_key(
     } else {
         // Trust on first use (TOFU)
         std::fs::write(fingerprint_path, &fp_hex).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::Permissions::from_mode(0o600);
+            std::fs::set_permissions(fingerprint_path, perms)
+                .map_err(|e| format!("Konnte Fingerprint-Dateiberechtigungen nicht setzen: {}", e))?;
+        }
     }
 
     let _ = host_key; // suppress unused warning
