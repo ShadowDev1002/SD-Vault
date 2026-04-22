@@ -4,3 +4,10 @@ dist/
 target/
 *.db
 *.salt
+release/
+flatpak-repo/
+flatpak-build/
+.flatpak-builder/
+build/windows/*.exe
+build/windows/sd-vault.exe
+build/windows/icon.ico
