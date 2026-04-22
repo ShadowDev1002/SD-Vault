@@ -63,15 +63,15 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
         >
             <div
                 className="w-full max-w-2xl rounded-xl border overflow-hidden flex flex-col"
-                style={{ backgroundColor: 'var(--vault-surface)', borderColor: 'var(--vault-border)', maxHeight: '82vh' }}
+                style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', maxHeight: '82vh' }}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--vault-border)' }}>
+                <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
                     <h2 className="text-sm font-bold text-white tracking-wide">Einstellungen</h2>
                     <button
                         onClick={onClose}
                         className="w-7 h-7 flex items-center justify-center rounded-lg text-lg leading-none transition-colors"
-                        style={{ color: 'var(--vault-muted)' }}
+                        style={{ color: 'var(--text-2)' }}
                         onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)')}
                         onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
@@ -81,18 +81,18 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
 
                 <div className="flex flex-1 min-h-0">
                     {/* Left nav */}
-                    <nav className="w-44 border-r shrink-0 p-2 space-y-0.5" style={{ borderColor: 'var(--vault-border)' }}>
+                    <nav className="w-44 border-r shrink-0 p-2 space-y-0.5" style={{ borderColor: 'var(--border)' }}>
                         {NAV.map(({ id, label, icon }) => (
                             <button
                                 key={id}
                                 onClick={() => setTab(id)}
                                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-left transition-colors"
                                 style={{
-                                    backgroundColor: tab === id ? 'rgba(99,102,241,0.18)' : 'transparent',
-                                    color: tab === id ? 'white' : 'var(--vault-muted)',
+                                    backgroundColor: tab === id ? 'rgba(10,132,255,0.15)' : 'transparent',
+                                    color: tab === id ? 'white' : 'var(--text-2)',
                                 }}
                             >
-                                <span className="w-4 h-4 shrink-0" style={{ color: tab === id ? '#818cf8' : undefined }}>
+                                <span className="w-4 h-4 shrink-0" style={{ color: tab === id ? 'var(--accent)' : undefined }}>
                                     {icon}
                                 </span>
                                 <span>{label}</span>
@@ -115,14 +115,14 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
                                     <img src={logoUrl} alt="SD-Vault" className="w-14 h-14 shrink-0" />
                                     <div>
                                         <h3 className="text-base font-bold text-white">SD-Vault</h3>
-                                        <p className="text-sm mt-0.5" style={{ color: 'var(--vault-muted)' }}>Version {APP_VERSION}</p>
-                                        <p className="text-xs mt-1" style={{ color: 'var(--vault-muted)' }}>
+                                        <p className="text-sm mt-0.5" style={{ color: 'var(--text-2)' }}>Version {APP_VERSION}</p>
+                                        <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>
                                             Lokaler Passwort-Manager mit Ende-zu-Ende-Verschlüsselung
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="border-t" style={{ borderColor: 'var(--vault-border)' }} />
+                                <div className="border-t" style={{ borderColor: 'var(--border)' }} />
 
                                 {/* Update check */}
                                 <div className="space-y-3">
@@ -132,7 +132,7 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
                                         onClick={checkForUpdate}
                                         disabled={updateState === 'checking'}
                                         className="px-4 py-2 rounded-lg text-sm text-white disabled:opacity-60 transition-opacity"
-                                        style={{ backgroundColor: 'var(--vault-accent)' }}
+                                        style={{ backgroundColor: 'var(--accent)' }}
                                     >
                                         {updateState === 'checking' ? 'Prüfe…' : 'Auf Updates prüfen'}
                                     </button>
@@ -152,7 +152,7 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
                                                     v{latestVersion}
                                                 </span>
                                             </div>
-                                            <p className="text-xs" style={{ color: 'var(--vault-muted)' }}>
+                                            <p className="text-xs" style={{ color: 'var(--text-2)' }}>
                                                 Eine neue Version ist auf GitHub verfügbar. Aktuelle Version: v{APP_VERSION}
                                             </p>
                                             <button
@@ -173,7 +173,7 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
                                     )}
                                 </div>
 
-                                <div className="border-t" style={{ borderColor: 'var(--vault-border)' }} />
+                                <div className="border-t" style={{ borderColor: 'var(--border)' }} />
 
                                 {/* Links */}
                                 <div className="space-y-2">
@@ -181,9 +181,9 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
                                     <button
                                         onClick={() => openUrl(`https://github.com/${GITHUB_REPO}`)}
                                         className="flex items-center gap-1.5 text-sm transition-colors"
-                                        style={{ color: 'var(--vault-muted)' }}
+                                        style={{ color: 'var(--text-2)' }}
                                         onMouseEnter={e => (e.currentTarget.style.color = 'white')}
-                                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--vault-muted)')}
+                                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-2)')}
                                     >
                                         <span>GitHub Repository</span>
                                         <ExternalLinkIcon />
@@ -191,9 +191,9 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
                                     <button
                                         onClick={() => openUrl(`https://github.com/${GITHUB_REPO}/releases`)}
                                         className="flex items-center gap-1.5 text-sm transition-colors"
-                                        style={{ color: 'var(--vault-muted)' }}
+                                        style={{ color: 'var(--text-2)' }}
                                         onMouseEnter={e => (e.currentTarget.style.color = 'white')}
-                                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--vault-muted)')}
+                                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-2)')}
                                     >
                                         <span>Alle Releases</span>
                                         <ExternalLinkIcon />

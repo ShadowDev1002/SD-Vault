@@ -23,9 +23,9 @@ const CATEGORIES: { key: Category | 'all'; label: string; icon: JSX.Element }[] 
 
 export default function Sidebar({ activeCategory, onCategoryChange, search, onSearchChange, onLock, onSettings, hasUpdate }: Props) {
     return (
-        <aside className="flex flex-col h-full w-56 border-r shrink-0" style={{ backgroundColor: 'var(--vault-surface)', borderColor: 'var(--vault-border)' }}>
+        <aside className="flex flex-col h-full w-56 border-r shrink-0" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
             {/* Logo + version */}
-            <div className="px-4 py-4 border-b" style={{ borderColor: 'var(--vault-border)' }}>
+            <div className="px-4 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
                 <div className="flex items-center gap-2.5">
                     <img src={logoUrl} alt="SD-Vault" className="w-7 h-7 shrink-0" />
                     <div>
@@ -50,7 +50,7 @@ export default function Sidebar({ activeCategory, onCategoryChange, search, onSe
                     onChange={e => onSearchChange(e.target.value)}
                     placeholder="Suchen..."
                     className="w-full px-3 py-1.5 text-sm rounded-lg border text-white focus:outline-none"
-                    style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }}
+                    style={{ backgroundColor: 'var(--surface-2)', borderColor: 'var(--border)' }}
                 />
             </div>
 
@@ -62,11 +62,11 @@ export default function Sidebar({ activeCategory, onCategoryChange, search, onSe
                         onClick={() => onCategoryChange(key)}
                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-colors"
                         style={{
-                            backgroundColor: activeCategory === key ? 'rgba(99,102,241,0.18)' : 'transparent',
-                            color: activeCategory === key ? 'white' : 'var(--vault-muted)',
+                            backgroundColor: activeCategory === key ? 'rgba(10,132,255,0.15)' : 'transparent',
+                            color: activeCategory === key ? 'white' : 'var(--text-2)',
                         }}
                     >
-                        <span className="w-4 h-4 shrink-0" style={{ color: activeCategory === key ? '#818cf8' : undefined }}>
+                        <span className="w-4 h-4 shrink-0" style={{ color: activeCategory === key ? 'var(--accent)' : undefined }}>
                             {icon}
                         </span>
                         <span>{label}</span>
@@ -75,7 +75,7 @@ export default function Sidebar({ activeCategory, onCategoryChange, search, onSe
             </nav>
 
             {/* Bottom actions */}
-            <div className="p-3 border-t space-y-1.5" style={{ borderColor: 'var(--vault-border)' }}>
+            <div className="p-3 border-t space-y-1.5" style={{ borderColor: 'var(--border)' }}>
                 <button
                     onClick={onSettings}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
