@@ -6,12 +6,13 @@ type Tab = 'security' | 'sync';
 
 interface Props {
     isUnlocked: boolean;
+    lockTimeout: number;
+    onTimeoutChange: (minutes: number) => void;
     onClose: () => void;
 }
 
-export default function Settings({ isUnlocked, onClose }: Props) {
+export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onClose }: Props) {
     const [tab, setTab] = useState<Tab>('security');
-    const [lockTimeout, setLockTimeout] = useState(5);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
@@ -42,7 +43,7 @@ export default function Settings({ isUnlocked, onClose }: Props) {
                 {/* Content */}
                 <div className="p-6 max-h-96 overflow-y-auto">
                     {tab === 'security' && (
-                        <SecuritySettings lockTimeout={lockTimeout} onTimeoutChange={setLockTimeout} />
+                        <SecuritySettings lockTimeout={lockTimeout} onTimeoutChange={onTimeoutChange} />
                     )}
                     {tab === 'sync' && (
                         <SyncSettings isUnlocked={isUnlocked} />

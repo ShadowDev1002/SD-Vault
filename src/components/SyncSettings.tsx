@@ -58,7 +58,7 @@ export default function SyncSettings({ isUnlocked }: Props) {
                 : { type: 'Password', password },
         };
         try {
-            await invoke('save_sftp_config', { sftp_config });
+            await invoke('save_sftp_config', { sftpConfig: sftp_config });
             setSftpMsg('✓ Konfiguration gespeichert');
         } catch (err) {
             setSftpMsg('Fehler: ' + String(err));

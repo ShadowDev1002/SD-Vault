@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import LockScreen from './components/LockScreen';
 import FirstRunSetup from './components/FirstRunSetup';
@@ -13,37 +13,41 @@ export default function App() {
     const [appState, setAppState] = useState<AppState>('loading');
     const [meta, setMeta] = useState<VaultMeta | null>(null);
     const [showSettings, setShowSettings] = useState(false);
+    const [lockTimeout, setLockTimeout] = useState(5);
+    const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    useEffect(() => { initApp(); }, []);
+    useEffect(() => {
+        invoke<boolean>('vault_exists').then(exists => {
+            setAppState(exists ? 'locked' : 'first-run');
+        });
+    }, []);
 
-    async function initApp() {
-        try {
-            const exists = await invoke<boolean>('check_vault_exists');
-            if (!exists) {
-                setAppState('first-run');
-                return;
-            }
-            const unlocked = await invoke<boolean>('is_unlocked');
-            if (unlocked) {
-                const m = await invoke<VaultMeta>('get_vault_meta');
-                setMeta(m);
-                setAppState('unlocked');
-            } else {
-                setAppState('locked');
-            }
-        } catch {
-            setAppState('locked');
-        }
-    }
+    const handleLocked = useCallback(async () => {
+        if (lockTimer.current) clearTimeout(lockTimer.current);
+        await invoke('lock_vault');
+        setMeta(null);
+        setAppState('locked');
+    }, []);
+
+    const resetLockTimer = useCallback(() => {
+        if (lockTimer.current) clearTimeout(lockTimer.current);
+        lockTimer.current = setTimeout(() => handleLocked(), lockTimeout * 60 * 1000);
+    }, [lockTimeout, handleLocked]);
+
+    useEffect(() => {
+        if (appState !== 'unlocked') return;
+        const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+        events.forEach(e => window.addEventListener(e, resetLockTimer, { passive: true }));
+        resetLockTimer();
+        return () => {
+            events.forEach(e => window.removeEventListener(e, resetLockTimer));
+            if (lockTimer.current) clearTimeout(lockTimer.current);
+        };
+    }, [appState, resetLockTimer]);
 
     function handleUnlocked(m: VaultMeta) {
         setMeta(m);
         setAppState('unlocked');
-    }
-
-    function handleLocked() {
-        setMeta(null);
-        setAppState('locked');
     }
 
     if (appState === 'loading') return null;
@@ -62,6 +66,8 @@ export default function App() {
             {showSettings && (
                 <Settings
                     isUnlocked={appState === 'unlocked'}
+                    lockTimeout={lockTimeout}
+                    onTimeoutChange={setLockTimeout}
                     onClose={() => setShowSettings(false)}
                 />
             )}
