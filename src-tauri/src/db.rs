@@ -66,6 +66,65 @@ pub struct CustomField {
     #[serde(default)] pub field_type: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AttachmentMeta {
+    pub id: String,
+    pub item_id: String,
+    pub name: String,
+    pub mime: String,
+    pub size: i64,
+}
+
+pub fn insert_attachment(
+    conn: &Connection,
+    entry_key: &[u8; 32],
+    item_id: &str,
+    name: &str,
+    mime: &str,
+    data: &[u8],
+) -> Result<String, String> {
+    let id = Uuid::new_v4().to_string();
+    let blob = crypto::encrypt(entry_key, data)?;
+    conn.execute(
+        "INSERT INTO attachments (id, item_id, name, mime, size, encrypted_blob) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![id, item_id, name, mime, data.len() as i64, blob],
+    ).map_err(|e| e.to_string())?;
+    Ok(id)
+}
+
+pub fn get_attachments(conn: &Connection, item_id: &str) -> Result<Vec<AttachmentMeta>, String> {
+    let mut stmt = conn.prepare(
+        "SELECT id, item_id, name, mime, size FROM attachments WHERE item_id = ?1 ORDER BY rowid ASC"
+    ).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(params![item_id], |row| Ok(AttachmentMeta {
+        id: row.get(0)?,
+        item_id: row.get(1)?,
+        name: row.get(2)?,
+        mime: row.get(3)?,
+        size: row.get(4)?,
+    })).map_err(|e| e.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+}
+
+pub fn get_attachment_data(
+    conn: &Connection,
+    entry_key: &[u8; 32],
+    id: &str,
+) -> Result<Vec<u8>, String> {
+    let blob: Vec<u8> = conn.query_row(
+        "SELECT encrypted_blob FROM attachments WHERE id = ?1",
+        params![id],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+    crypto::decrypt(entry_key, &blob)
+}
+
+pub fn delete_attachment(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM attachments WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Öffnet (oder erstellt) eine SQLCipher-Datenbank. Der Key MUSS gesetzt werden
 /// bevor irgendeine andere Operation ausgeführt wird.
 pub fn open_db(path: &Path, sqlcipher_key: &[u8; 32]) -> Result<Connection, String> {
@@ -98,6 +157,14 @@ fn ensure_schema(conn: &Connection) -> Result<(), String> {
             category        TEXT NOT NULL,
             updated_at      INTEGER NOT NULL,
             sync_hash       TEXT NOT NULL,
+            encrypted_blob  BLOB NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS attachments (
+            id              TEXT PRIMARY KEY,
+            item_id         TEXT NOT NULL,
+            name            TEXT NOT NULL,
+            mime            TEXT NOT NULL DEFAULT '',
+            size            INTEGER NOT NULL,
             encrypted_blob  BLOB NOT NULL
         );",
     )

@@ -5,6 +5,7 @@ pub mod config;
 pub mod google_drive;
 pub mod local;
 pub mod sftp;
+pub mod webdav;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BackupEntry {

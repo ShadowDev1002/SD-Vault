@@ -161,6 +161,13 @@ pub fn run() {
             commands::list_local_backups,
             commands::reset_master_password,
             commands::open_url,
+            commands::sync_webdav,
+            commands::save_webdav_config,
+            commands::get_attachments,
+            commands::add_attachment,
+            commands::get_attachment_data,
+            commands::delete_attachment,
+            commands::export_entry_pdf,
         ])
         .run(tauri::generate_context!())
         .expect("SD-Vault konnte nicht gestartet werden");

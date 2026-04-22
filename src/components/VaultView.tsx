@@ -4,6 +4,7 @@ import type { Item, VaultMeta, Category } from '../types';
 import Sidebar from './Sidebar';
 import EntryList from './EntryList';
 import EntryDetail from './EntryDetail';
+import QuickSearch from './QuickSearch';
 
 interface Props {
     meta: VaultMeta;
@@ -18,6 +19,7 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
     const [search, setSearch] = useState('');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isNew, setIsNew] = useState(false);
+    const [showQuickSearch, setShowQuickSearch] = useState(false);
 
     const loadItems = useCallback(async () => {
         try {
@@ -29,6 +31,17 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
     }, []);
 
     useEffect(() => { loadItems(); }, [loadItems]);
+
+    useEffect(() => {
+        function onKey(e: KeyboardEvent) {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                setShowQuickSearch(s => !s);
+            }
+        }
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
 
     async function handleLock() {
         await invoke('lock_vault');
@@ -84,6 +97,13 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
                 isNew={isNew}
                 newCategory={activeCategory === 'all' ? 'login' : activeCategory}
             />
+            {showQuickSearch && (
+                <QuickSearch
+                    items={items}
+                    onSelect={id => { setSelectedId(id); setIsNew(false); }}
+                    onClose={() => setShowQuickSearch(false)}
+                />
+            )}
         </div>
     );
 }

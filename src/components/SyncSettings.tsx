@@ -21,6 +21,12 @@ export default function SyncSettings({ isUnlocked }: Props) {
     const [password, setPassword] = useState('');
     const [sftpMsg, setSftpMsg] = useState('');
 
+    // WebDAV form state
+    const [webdavUrl, setWebdavUrl] = useState('');
+    const [webdavUser, setWebdavUser] = useState('');
+    const [webdavPass, setWebdavPass] = useState('');
+    const [webdavMsg, setWebdavMsg] = useState('');
+
     async function handleLocalBackup() {
         setLoadingBackup(true);
         setSyncMsg('');
@@ -165,6 +171,59 @@ export default function SyncSettings({ isUnlocked }: Props) {
                         </button>
                     </div>
                     {sftpMsg && <p className="text-sm" style={{ color: sftpMsg.startsWith('✓') ? '#22c55e' : 'var(--vault-danger)' }}>{sftpMsg}</p>}
+                </form>
+            </section>
+
+            {/* WebDAV */}
+            <section className="space-y-3">
+                <h3 className="text-sm font-semibold text-white">WebDAV Sync</h3>
+                <p className="text-xs" style={{ color: 'var(--vault-muted)' }}>
+                    Kompatibel mit Nextcloud, ownCloud und anderen WebDAV-Servern.
+                </p>
+                <form onSubmit={async e => {
+                    e.preventDefault(); setWebdavMsg('');
+                    try {
+                        await invoke('save_webdav_config', {
+                            webdavConfig: { url: webdavUrl, username: webdavUser, password: webdavPass, remote_path: '/sd-vault' }
+                        });
+                        setWebdavMsg('✓ Konfiguration gespeichert');
+                    } catch (err) { setWebdavMsg('Fehler: ' + String(err)); }
+                }} className="space-y-3">
+                    <div>
+                        <label className="block text-xs mb-1" style={{ color: 'var(--vault-muted)' }}>Server-URL</label>
+                        <input value={webdavUrl} onChange={e => setWebdavUrl(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border text-white text-sm"
+                            style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }}
+                            placeholder="https://nextcloud.example.com/remote.php/dav/files/user" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--vault-muted)' }}>Benutzername</label>
+                            <input value={webdavUser} onChange={e => setWebdavUser(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg border text-white text-sm"
+                                style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }} />
+                        </div>
+                        <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--vault-muted)' }}>Passwort</label>
+                            <input value={webdavPass} onChange={e => setWebdavPass(e.target.value)}
+                                type="password"
+                                className="w-full px-3 py-2 rounded-lg border text-white text-sm"
+                                style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }} />
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <button type="submit" className="px-4 py-2 rounded-lg text-sm text-white" style={{ backgroundColor: 'var(--vault-accent)' }}>
+                            Speichern
+                        </button>
+                        <button type="button" onClick={async () => {
+                            setWebdavMsg('');
+                            try { await invoke('sync_webdav'); setWebdavMsg('✓ WebDAV Sync erfolgreich'); }
+                            catch (err) { setWebdavMsg('Fehler: ' + String(err)); }
+                        }} className="px-4 py-2 rounded-lg text-sm border" style={{ borderColor: 'var(--vault-border)', color: 'var(--vault-muted)' }}>
+                            Jetzt synchronisieren
+                        </button>
+                    </div>
+                    {webdavMsg && <p className="text-sm" style={{ color: webdavMsg.startsWith('✓') ? '#22c55e' : 'var(--vault-danger)' }}>{webdavMsg}</p>}
                 </form>
             </section>
         </div>

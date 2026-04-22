@@ -1,4 +1,5 @@
 use chrono::{Datelike, Utc};
+use printpdf::{BuiltinFont, Mm, PdfDocument};
 use zeroize::Zeroize;
 use crate::db::{ItemPayload, ItemWithPayload, VaultMeta};
 use crate::AppState;
@@ -272,4 +273,171 @@ pub async fn list_local_backups(state: State<'_, AppState>) -> Result<Vec<Backup
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), String> {
     open::that_detached(&url).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn sync_webdav(state: State<'_, AppState>) -> Result<(), String> {
+    let vault_dir = state.vault_dir.lock().unwrap().clone().ok_or("Vault ist gesperrt")?;
+    let config = crate::sync::config::SyncConfig::load(&vault_dir.join("sync_config.toml"))?;
+    let webdav_config = config.webdav.ok_or("Keine WebDAV-Konfiguration gefunden")?;
+    let data = fs::read(vault_dir.join("vault.db")).map_err(|e| e.to_string())?;
+    crate::sync::webdav::WebDavProvider::new(webdav_config)
+        .upload(&data, "vault.db")
+        .await
+}
+
+#[tauri::command]
+pub fn save_webdav_config(
+    state: State<'_, AppState>,
+    webdav_config: crate::sync::config::WebDavConfig,
+) -> Result<(), String> {
+    let vault_dir = state.vault_dir.lock().unwrap().clone().ok_or("Vault ist gesperrt")?;
+    let config_path = vault_dir.join("sync_config.toml");
+    let mut config = crate::sync::config::SyncConfig::load(&config_path).unwrap_or_default();
+    config.webdav = Some(webdav_config);
+    config.save(&config_path)
+}
+
+#[tauri::command]
+pub fn get_attachments(
+    state: State<'_, AppState>,
+    item_id: String,
+) -> Result<Vec<crate::db::AttachmentMeta>, String> {
+    let conn_guard = state.db_conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    crate::db::get_attachments(conn, &item_id)
+}
+
+#[tauri::command]
+pub fn add_attachment(
+    state: State<'_, AppState>,
+    item_id: String,
+    name: String,
+    mime: String,
+    data: Vec<u8>,
+) -> Result<String, String> {
+    if data.len() > 10 * 1024 * 1024 {
+        return Err("Anhang zu groß (max. 10 MB)".into());
+    }
+    let key_guard = state.master_key.lock().unwrap();
+    let master_key = key_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    let entry_key = crate::crypto::derive_entry_key(master_key);
+    let conn_guard = state.db_conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    crate::db::insert_attachment(conn, &entry_key, &item_id, &name, &mime, &data)
+}
+
+#[tauri::command]
+pub fn get_attachment_data(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Vec<u8>, String> {
+    let key_guard = state.master_key.lock().unwrap();
+    let master_key = key_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    let entry_key = crate::crypto::derive_entry_key(master_key);
+    let conn_guard = state.db_conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    crate::db::get_attachment_data(conn, &entry_key, &id)
+}
+
+#[tauri::command]
+pub fn delete_attachment(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    let conn_guard = state.db_conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    crate::db::delete_attachment(conn, &id)
+}
+
+#[tauri::command]
+pub fn export_entry_pdf(
+    state: State<'_, AppState>,
+    id: String,
+    save_path: String,
+) -> Result<(), String> {
+    let key_guard = state.master_key.lock().unwrap();
+    let master_key = key_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    let entry_key = crate::crypto::derive_entry_key(master_key);
+    let conn_guard = state.db_conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+
+    let items = crate::db::get_items(conn, &entry_key, None)?;
+    let item = items.into_iter().find(|i| i.id == id)
+        .ok_or("Eintrag nicht gefunden")?;
+    let p = &item.payload;
+
+    let (doc, page1, layer1) = PdfDocument::new("SD-Vault Export", Mm(210.0), Mm(297.0), "Layer 1");
+    let layer = doc.get_page(page1).get_layer(layer1);
+    let font = doc.add_builtin_font(BuiltinFont::HelveticaBold).map_err(|e| e.to_string())?;
+    let font_reg = doc.add_builtin_font(BuiltinFont::Helvetica).map_err(|e| e.to_string())?;
+
+    let mut y = 270.0f32;
+
+    layer.use_text("SD-Vault — Eintrag Export", 16.0, Mm(20.0), Mm(y), &font);
+    y -= 8.0;
+    layer.use_text(
+        &format!("Erstellt: {}", Utc::now().format("%d.%m.%Y %H:%M UTC")),
+        9.0, Mm(20.0), Mm(y), &font_reg,
+    );
+    y -= 15.0;
+
+    layer.use_text(&format!("Titel: {}", p.title), 13.0, Mm(20.0), Mm(y), &font);
+    y -= 8.0;
+    layer.use_text(&format!("Kategorie: {}", item.category), 10.0, Mm(20.0), Mm(y), &font_reg);
+    y -= 12.0;
+
+    let card_last4 = if p.card_number.len() >= 4 {
+        format!("**** {}", &p.card_number[p.card_number.len()-4..])
+    } else {
+        p.card_number.clone()
+    };
+
+    let fields: &[(&str, &str)] = &[
+        ("Benutzername",   &p.username),
+        ("URL",            &p.url),
+        ("E-Mail",         &p.email),
+        ("Karteninhaber",  &p.cardholder),
+        ("Kartennummer",   &card_last4),
+        ("Ablaufdatum",    &p.expiry),
+        ("Vorname",        &p.first_name),
+        ("Nachname",       &p.last_name),
+        ("Telefon",        &p.phone),
+        ("Unternehmen",    &p.company),
+        ("Position",       &p.job_title),
+        ("Adresse",        &p.address),
+        ("Stadt",          &p.city),
+        ("PLZ",            &p.zip),
+        ("Land",           &p.country),
+        ("Geburtstag",     &p.birthday),
+    ];
+
+    for (label, value) in fields {
+        if value.is_empty() { continue; }
+        layer.use_text(&format!("{}: {}", label, value), 10.0, Mm(20.0), Mm(y), &font_reg);
+        y -= 7.0;
+        if y < 20.0 { break; }
+    }
+
+    if !p.notes.is_empty() {
+        y -= 3.0;
+        layer.use_text("Notizen:", 10.0, Mm(20.0), Mm(y), &font);
+        y -= 7.0;
+        for line in p.notes.lines().take(20) {
+            if y < 20.0 { break; }
+            layer.use_text(line, 9.0, Mm(20.0), Mm(y), &font_reg);
+            y -= 6.0;
+        }
+    }
+
+    layer.use_text(
+        "Dieses Dokument enthalt sensible Daten — sicher aufbewahren.",
+        8.0, Mm(20.0), Mm(12.0), &font_reg,
+    );
+
+    doc.save(&mut std::io::BufWriter::new(
+        fs::File::create(&save_path).map_err(|e| e.to_string())?
+    )).map_err(|e| e.to_string())?;
+
+    Ok(())
 }

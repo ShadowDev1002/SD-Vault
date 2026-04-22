@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { Item, ItemPayload, Category, CustomField, FieldType } from '../types';
+import type { Item, ItemPayload, Category, CustomField, FieldType, AttachmentMeta } from '../types';
 import { copyToClipboard } from '../utils/clipboard';
 import { measureStrength } from '../utils/strength';
+import { generateTotp } from '../utils/totp';
+import { checkHibp } from '../utils/hibp';
 
 interface Props {
     item: Item | null;
@@ -75,6 +77,63 @@ function VField({
     );
 }
 
+// ─── TOTP live code ────────────────────────────────────────────
+function TotpField({ secret, onCopy }: { secret: string; onCopy: () => void }) {
+    const [code, setCode] = useState('------');
+    const [remaining, setRemaining] = useState(30);
+    const [err, setErr] = useState(false);
+
+    useEffect(() => {
+        if (!secret) return;
+        let cancelled = false;
+        async function tick() {
+            try {
+                const r = await generateTotp(secret);
+                if (!cancelled) { setCode(r.code); setRemaining(r.remaining); setErr(false); }
+            } catch { if (!cancelled) setErr(true); }
+        }
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => { cancelled = true; clearInterval(id); };
+    }, [secret]);
+
+    const pct = remaining / 30;
+    const r = 10, circ = 2 * Math.PI * r;
+
+    return (
+        <div className="group flex items-start gap-3 py-3 px-4 border-b last:border-b-0" style={{ borderColor: 'var(--border-2)' }}>
+            <div className="flex-1 min-w-0">
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-3)' }}>Einmalcode (TOTP)</p>
+                {err ? (
+                    <span className="text-sm" style={{ color: '#ff453a' }}>Ungültiger TOTP-Secret</span>
+                ) : (
+                    <div className="flex items-center gap-3">
+                        <span className="text-2xl font-mono tracking-[0.2em] font-semibold" style={{ color: remaining <= 5 ? '#ff453a' : 'var(--text)' }}>
+                            {code.slice(0, 3)} {code.slice(3)}
+                        </span>
+                        <svg width="26" height="26" viewBox="0 0 26 26">
+                            <circle cx="13" cy="13" r={r} fill="none" stroke="var(--border-2)" strokeWidth="2.5" />
+                            <circle cx="13" cy="13" r={r} fill="none"
+                                stroke={remaining <= 5 ? '#ff453a' : 'var(--accent)'}
+                                strokeWidth="2.5"
+                                strokeDasharray={circ}
+                                strokeDashoffset={circ * (1 - pct)}
+                                strokeLinecap="round"
+                                transform="rotate(-90 13 13)"
+                                style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}
+                            />
+                        </svg>
+                        <span className="text-xs tabular-nums" style={{ color: 'var(--text-3)' }}>{remaining}s</span>
+                    </div>
+                )}
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-4">
+                {!err && <SmBtn onClick={onCopy} title="Kopieren"><CopySvg /></SmBtn>}
+            </div>
+        </div>
+    );
+}
+
 // ─── Section card ──────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -117,6 +176,10 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState<string | null>(null);
+    const [hibpCount, setHibpCount] = useState<number | null>(null);
+    const [hibpChecking, setHibpChecking] = useState(false);
+    const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
+    const [dragOver, setDragOver] = useState(false);
 
     useEffect(() => {
         setP(item?.payload ?? { ...EMPTY_PAYLOAD });
@@ -124,7 +187,15 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
         setEditing(isNew ?? false);
         setShowPw(false);
         setError('');
-    }, [item, isNew, newCategory]);
+        setHibpCount(null);
+        if (item && !isNew) {
+            invoke<AttachmentMeta[]>('get_attachments', { itemId: item.id })
+                .then(setAttachments)
+                .catch(() => setAttachments([]));
+        } else {
+            setAttachments([]);
+        }
+    }, [item?.id, isNew, newCategory]);
 
     const strength = measureStrength(p.password);
     const meta = CATEGORY_META[cat];
@@ -190,6 +261,42 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
 
     function removeCustomField(id: string) {
         setP(prev => ({ ...prev, fields: prev.fields.filter(f => f.id !== id) }));
+    }
+
+    async function handleAttachmentDrop(files: FileList | null) {
+        if (!files || !item) return;
+        for (const file of Array.from(files)) {
+            if (file.size > 10 * 1024 * 1024) { alert(`${file.name} ist zu groß (max. 10 MB)`); continue; }
+            const buf = await file.arrayBuffer();
+            const data = Array.from(new Uint8Array(buf));
+            await invoke('add_attachment', { itemId: item.id, name: file.name, mime: file.type, data });
+        }
+        const updated = await invoke<AttachmentMeta[]>('get_attachments', { itemId: item.id });
+        setAttachments(updated);
+    }
+
+    async function handleDownloadAttachment(att: AttachmentMeta) {
+        const bytes: number[] = await invoke('get_attachment_data', { id: att.id });
+        const blob = new Blob([new Uint8Array(bytes)], { type: att.mime || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = att.name; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async function handleExportPdf() {
+        if (!item) return;
+        try {
+            const { save } = await import('@tauri-apps/plugin-dialog');
+            const path = await save({
+                defaultPath: `${item.payload.title || 'eintrag'}.pdf`,
+                filters: [{ name: 'PDF', extensions: ['pdf'] }],
+            });
+            if (!path) return;
+            await invoke('export_entry_pdf', { id: item.id, savePath: path });
+        } catch (err) {
+            setError(String(err));
+        }
     }
 
     if (!item && !isNew) {
@@ -442,6 +549,12 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                                 <path d="M10 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L10 14.3l-4.8 2.6.9-5.4L2.2 7.7l5.4-.8L10 2z" strokeLinejoin="round" />
                             </svg>
                         </SmBtn>
+                        <SmBtn onClick={handleExportPdf} title="Als PDF exportieren">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                <path d="M4 2h6l4 4v8a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" strokeLinejoin="round"/>
+                                <path d="M9 2v4h4M6 9h4M6 12h2" strokeLinecap="round"/>
+                            </svg>
+                        </SmBtn>
                         <SmBtn onClick={() => setEditing(true)} title="Bearbeiten"><EditSvg /></SmBtn>
                         <SmBtn onClick={handleDelete} title="Löschen" danger><TrashSvg /></SmBtn>
                     </div>
@@ -454,8 +567,35 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                     <Section title="Anmeldedaten">
                         <VField label="Benutzername" value={p.username} onCopy={() => cp(p.username, 'username')} />
                         <VField label="Passwort" value={p.password} secret mono onCopy={() => cp(p.password, 'password')} />
+                        {p.password && (
+                            <div className="px-4 py-2 flex items-center gap-3 border-b" style={{ borderColor: 'var(--border-2)' }}>
+                                <button
+                                    onClick={async () => {
+                                        setHibpChecking(true); setHibpCount(null);
+                                        try { setHibpCount(await checkHibp(p.password)); }
+                                        catch { setHibpCount(-1); }
+                                        finally { setHibpChecking(false); }
+                                    }}
+                                    disabled={hibpChecking}
+                                    className="text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50"
+                                    style={{ borderColor: 'var(--border)', color: 'var(--text-3)', backgroundColor: 'transparent' }}
+                                >
+                                    {hibpChecking ? 'Prüfe…' : 'Auf Datenleck prüfen'}
+                                </button>
+                                {hibpCount !== null && hibpCount >= 0 && (
+                                    hibpCount === 0
+                                        ? <span className="text-xs" style={{ color: '#32d74b' }}>✓ Kein Datenleck gefunden</span>
+                                        : <span className="text-xs font-medium" style={{ color: '#ff453a' }}>⚠ {hibpCount.toLocaleString('de-DE')}× in Datenlecks</span>
+                                )}
+                                {hibpCount === -1 && <span className="text-xs" style={{ color: 'var(--text-3)' }}>Prüfung fehlgeschlagen</span>}
+                            </div>
+                        )}
                         <VField label="Website" value={p.url} onCopy={() => cp(p.url, 'url')} onOpen={() => openUrl(p.url)} />
-                        {p.totp && <VField label="2FA-Schlüssel" value={p.totp} secret mono onCopy={() => cp(p.totp, 'totp')} />}
+                        {p.totp && (
+                            <TotpField secret={p.totp} onCopy={async () => {
+                                try { const { code } = await generateTotp(p.totp); copyToClipboard(code); } catch {}
+                            }} />
+                        )}
                     </Section>
                 )}
 
@@ -516,6 +656,44 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                                 secret={f.field_type === 'password'}
                                 onCopy={() => cp(f.value, f.id)}
                             />
+                        ))}
+                    </Section>
+                )}
+
+                {/* Anhänge */}
+                {item && !isNew && (
+                    <Section title="Anhänge">
+                        <div
+                            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                            onDragLeave={() => setDragOver(false)}
+                            onDrop={e => { e.preventDefault(); setDragOver(false); handleAttachmentDrop(e.dataTransfer.files); }}
+                            onClick={() => { const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.onchange = () => handleAttachmentDrop(inp.files); inp.click(); }}
+                            className="mx-4 my-2 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 py-5 transition-colors cursor-pointer"
+                            style={{ borderColor: dragOver ? 'var(--accent)' : 'var(--border)', backgroundColor: dragOver ? 'rgba(10,132,255,0.05)' : 'transparent' }}
+                        >
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--text-3)' }}>
+                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            <p className="text-xs" style={{ color: 'var(--text-3)' }}>Dateien hierhin ziehen oder klicken (max. 10 MB)</p>
+                        </div>
+                        {attachments.map(att => (
+                            <div key={att.id} className="group flex items-center gap-3 px-4 py-3 border-t" style={{ borderColor: 'var(--border-2)' }}>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm truncate" style={{ color: 'var(--text)' }}>{att.name}</p>
+                                    <p className="text-xs" style={{ color: 'var(--text-3)' }}>{(att.size / 1024).toFixed(1)} KB</p>
+                                </div>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <SmBtn onClick={() => handleDownloadAttachment(att)} title="Herunterladen">
+                                        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                            <path d="M8 2v8M5 7l3 3 3-3" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M3 12h10" strokeLinecap="round"/>
+                                        </svg>
+                                    </SmBtn>
+                                    <SmBtn onClick={async () => { await invoke('delete_attachment', { id: att.id }); setAttachments(prev => prev.filter(a => a.id !== att.id)); }} title="Löschen" danger>
+                                        <TrashSvg />
+                                    </SmBtn>
+                                </div>
+                            </div>
                         ))}
                     </Section>
                 )}

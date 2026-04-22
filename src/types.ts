@@ -72,6 +72,21 @@ export interface SftpConfig {
         | { type: 'KeyFile'; key_path: string };
 }
 
+export interface AttachmentMeta {
+    id: string;
+    item_id: string;
+    name: string;
+    mime: string;
+    size: number;
+}
+
+export interface WebDavConfig {
+    url: string;
+    username: string;
+    password: string;
+    remote_path: string;
+}
+
 export interface CreateVaultResult {
     vault_id: string;
     secret_key_formatted: string;

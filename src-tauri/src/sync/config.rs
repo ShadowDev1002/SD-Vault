@@ -17,9 +17,18 @@ pub struct SftpConfig {
     pub auth: SftpAuth,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct WebDavConfig {
+    pub url: String,
+    pub username: String,
+    pub password: String,
+    pub remote_path: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct SyncConfig {
     pub sftp: Option<SftpConfig>,
+    pub webdav: Option<WebDavConfig>,
 }
 
 impl SyncConfig {
