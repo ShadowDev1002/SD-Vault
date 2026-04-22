@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>de.shadowdev.sd-vault</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>SD-Vault</name>
+  <summary>Lokaler Passwort-Manager mit Ende-zu-Ende-Verschlüsselung</summary>
+  <description>
+    <p>SD-Vault ist ein lokaler Passwort-Manager mit AES-256-GCM Verschlüsselung,
+    TOTP-Generator, Have I Been Pwned Prüfung, WebDAV-Sync und verschlüsselten Anhängen.</p>
+  </description>
+  <url type="homepage">https://github.com/ShadowDev/sd-vault</url>
+  <releases>
+    <release version="0.1.0" date="2026-04-22"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

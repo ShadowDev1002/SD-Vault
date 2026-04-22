@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=SD-Vault
+Comment=Lokaler Passwort-Manager mit Ende-zu-Ende-Verschlüsselung
+Exec=sd-vault
+Icon=de.shadowdev.sd-vault
+Type=Application
+Categories=Utility;Security;
+Keywords=password;vault;security;passwort;
+StartupWMClass=sd-vault
