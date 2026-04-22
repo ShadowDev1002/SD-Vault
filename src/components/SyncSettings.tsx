@@ -1,0 +1,172 @@
+import { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import type { BackupEntry, SftpConfig } from '../types';
+
+interface Props {
+    isUnlocked: boolean;
+}
+
+export default function SyncSettings({ isUnlocked }: Props) {
+    const [backups, setBackups] = useState<BackupEntry[]>([]);
+    const [loadingBackup, setLoadingBackup] = useState(false);
+    const [syncMsg, setSyncMsg] = useState('');
+
+    // SFTP form state
+    const [host, setHost] = useState('');
+    const [port, setPort] = useState('22');
+    const [username, setUsername] = useState('');
+    const [remotePath, setRemotePath] = useState('/backups');
+    const [authType, setAuthType] = useState<'KeyFile' | 'Password'>('KeyFile');
+    const [keyPath, setKeyPath] = useState('');
+    const [password, setPassword] = useState('');
+    const [sftpMsg, setSftpMsg] = useState('');
+
+    async function handleLocalBackup() {
+        setLoadingBackup(true);
+        setSyncMsg('');
+        try {
+            await invoke('sync_local');
+            setSyncMsg('✓ Backup erstellt');
+            const list = await invoke<BackupEntry[]>('list_local_backups');
+            setBackups(list);
+        } catch (err) {
+            setSyncMsg('Fehler: ' + String(err));
+        } finally {
+            setLoadingBackup(false);
+        }
+    }
+
+    async function handleListBackups() {
+        try {
+            const list = await invoke<BackupEntry[]>('list_local_backups');
+            setBackups(list);
+        } catch {
+            // ignore
+        }
+    }
+
+    async function handleSaveSftp(e: React.FormEvent) {
+        e.preventDefault();
+        setSftpMsg('');
+        const sftp_config: SftpConfig = {
+            host,
+            port: parseInt(port, 10),
+            username,
+            remote_path: remotePath,
+            auth: authType === 'KeyFile'
+                ? { type: 'KeyFile', key_path: keyPath }
+                : { type: 'Password', password },
+        };
+        try {
+            await invoke('save_sftp_config', { sftp_config });
+            setSftpMsg('✓ Konfiguration gespeichert');
+        } catch (err) {
+            setSftpMsg('Fehler: ' + String(err));
+        }
+    }
+
+    async function handleSftpSync() {
+        setSyncMsg('');
+        try {
+            await invoke('sync_sftp');
+            setSyncMsg('✓ SFTP Sync erfolgreich');
+        } catch (err) {
+            setSyncMsg('Fehler: ' + String(err));
+        }
+    }
+
+    if (!isUnlocked) {
+        return <p className="text-sm" style={{ color: 'var(--vault-muted)' }}>Vault entsperren um Sync-Einstellungen zu ändern.</p>;
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Local Backup */}
+            <section className="space-y-3">
+                <h3 className="text-sm font-semibold text-white">Lokales Backup</h3>
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleLocalBackup}
+                        disabled={loadingBackup}
+                        className="px-4 py-2 rounded-lg text-sm text-white disabled:opacity-50"
+                        style={{ backgroundColor: 'var(--vault-accent)' }}
+                    >
+                        {loadingBackup ? 'Erstelle...' : 'Backup erstellen'}
+                    </button>
+                    <button
+                        onClick={handleListBackups}
+                        className="px-4 py-2 rounded-lg text-sm border"
+                        style={{ borderColor: 'var(--vault-border)', color: 'var(--vault-muted)' }}
+                    >
+                        Backups anzeigen
+                    </button>
+                </div>
+
+                {syncMsg && <p className="text-sm" style={{ color: syncMsg.startsWith('✓') ? '#22c55e' : 'var(--vault-danger)' }}>{syncMsg}</p>}
+
+                {backups.length > 0 && (
+                    <div className="space-y-1">
+                        {backups.map(b => (
+                            <div key={b.id} className="flex justify-between text-xs px-3 py-2 rounded border" style={{ borderColor: 'var(--vault-border)', color: 'var(--vault-muted)' }}>
+                                <span>{b.id}</span>
+                                <span>{(b.size_bytes / 1024).toFixed(1)} KB</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
+
+            {/* SFTP */}
+            <section className="space-y-3">
+                <h3 className="text-sm font-semibold text-white">SFTP Sync</h3>
+                <form onSubmit={handleSaveSftp} className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--vault-muted)' }}>Host</label>
+                            <input value={host} onChange={e => setHost(e.target.value)} className="w-full px-3 py-2 rounded-lg border text-white text-sm" style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }} placeholder="ssh.example.com" />
+                        </div>
+                        <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--vault-muted)' }}>Port</label>
+                            <input value={port} onChange={e => setPort(e.target.value)} type="number" className="w-full px-3 py-2 rounded-lg border text-white text-sm" style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }} />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs mb-1" style={{ color: 'var(--vault-muted)' }}>Benutzername</label>
+                        <input value={username} onChange={e => setUsername(e.target.value)} className="w-full px-3 py-2 rounded-lg border text-white text-sm" style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }} />
+                    </div>
+                    <div>
+                        <label className="block text-xs mb-1" style={{ color: 'var(--vault-muted)' }}>Remote-Pfad</label>
+                        <input value={remotePath} onChange={e => setRemotePath(e.target.value)} className="w-full px-3 py-2 rounded-lg border text-white text-sm" style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }} />
+                    </div>
+                    <div>
+                        <label className="block text-xs mb-1" style={{ color: 'var(--vault-muted)' }}>Authentifizierung</label>
+                        <select value={authType} onChange={e => setAuthType(e.target.value as 'KeyFile' | 'Password')} className="w-full px-3 py-2 rounded-lg border text-white text-sm" style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }}>
+                            <option value="KeyFile">SSH-Key</option>
+                            <option value="Password">Passwort</option>
+                        </select>
+                    </div>
+                    {authType === 'KeyFile' ? (
+                        <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--vault-muted)' }}>Pfad zum SSH-Key</label>
+                            <input value={keyPath} onChange={e => setKeyPath(e.target.value)} className="w-full px-3 py-2 rounded-lg border text-white text-sm font-mono" style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }} placeholder="/home/user/.ssh/id_ed25519" />
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="block text-xs mb-1" style={{ color: 'var(--vault-muted)' }}>Passwort</label>
+                            <input value={password} onChange={e => setPassword(e.target.value)} type="password" className="w-full px-3 py-2 rounded-lg border text-white text-sm" style={{ backgroundColor: 'var(--vault-bg)', borderColor: 'var(--vault-border)' }} />
+                        </div>
+                    )}
+                    <div className="flex gap-2">
+                        <button type="submit" className="px-4 py-2 rounded-lg text-sm text-white" style={{ backgroundColor: 'var(--vault-accent)' }}>
+                            Speichern
+                        </button>
+                        <button type="button" onClick={handleSftpSync} className="px-4 py-2 rounded-lg text-sm border" style={{ borderColor: 'var(--vault-border)', color: 'var(--vault-muted)' }}>
+                            Jetzt synchronisieren
+                        </button>
+                    </div>
+                    {sftpMsg && <p className="text-sm" style={{ color: sftpMsg.startsWith('✓') ? '#22c55e' : 'var(--vault-danger)' }}>{sftpMsg}</p>}
+                </form>
+            </section>
+        </div>
+    );
+}

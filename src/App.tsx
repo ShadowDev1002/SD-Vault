@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import LockScreen from './components/LockScreen';
 import FirstRunSetup from './components/FirstRunSetup';
 import VaultView from './components/VaultView';
+import Settings from './components/Settings';
 import type { VaultMeta } from './types';
 import './App.css';
 
@@ -11,6 +12,7 @@ type AppState = 'loading' | 'first-run' | 'locked' | 'unlocked';
 export default function App() {
     const [appState, setAppState] = useState<AppState>('loading');
     const [meta, setMeta] = useState<VaultMeta | null>(null);
+    const [showSettings, setShowSettings] = useState(false);
 
     useEffect(() => { initApp(); }, []);
 
@@ -46,19 +48,23 @@ export default function App() {
 
     if (appState === 'loading') return null;
 
-    if (appState === 'first-run') {
-        return <FirstRunSetup onCreated={handleUnlocked} />;
-    }
-
-    if (appState === 'locked') {
-        return <LockScreen onUnlocked={handleUnlocked} />;
-    }
-
     return (
-        <VaultView
-            meta={meta!}
-            onLocked={handleLocked}
-            onSettings={() => {/* TODO: settings modal */}}
-        />
+        <>
+            {appState === 'first-run' && <FirstRunSetup onCreated={handleUnlocked} />}
+            {appState === 'locked' && <LockScreen onUnlocked={handleUnlocked} />}
+            {appState === 'unlocked' && meta && (
+                <VaultView
+                    meta={meta}
+                    onLocked={handleLocked}
+                    onSettings={() => setShowSettings(true)}
+                />
+            )}
+            {showSettings && (
+                <Settings
+                    isUnlocked={appState === 'unlocked'}
+                    onClose={() => setShowSettings(false)}
+                />
+            )}
+        </>
     );
 }
