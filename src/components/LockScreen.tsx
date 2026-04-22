@@ -1,33 +1,10 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { VaultMeta } from '../types';
+import logoUrl from '../assets/logo.svg';
 
 interface Props {
     onUnlocked: (meta: VaultMeta) => void;
-}
-
-function ShieldIcon() {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" aria-hidden="true">
-            <path
-                d="M12 2L3 6v6c0 5.25 3.75 10.15 9 11.25C17.25 22.15 21 17.25 21 12V6L12 2z"
-                fill="url(#shieldGrad)"
-            />
-            <path
-                d="M9 12l2 2 4-4"
-                stroke="white"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-            <defs>
-                <linearGradient id="shieldGrad" x1="3" y1="2" x2="21" y2="23" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#818cf8" />
-                    <stop offset="1" stopColor="#6366f1" />
-                </linearGradient>
-            </defs>
-        </svg>
-    );
 }
 
 export default function LockScreen({ onUnlocked }: Props) {
@@ -84,10 +61,10 @@ export default function LockScreen({ onUnlocked }: Props) {
                     {/* Logo */}
                     <div className="flex flex-col items-center mb-8">
                         <div
-                            className="p-3 rounded-2xl mb-4"
-                            style={{ backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}
+                            className="p-2 rounded-2xl mb-4"
+                            style={{ backgroundColor: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}
                         >
-                            <ShieldIcon />
+                            <img src={logoUrl} alt="SD-Vault" className="w-14 h-14" draggable={false} />
                         </div>
                         <h1 className="text-xl font-semibold tracking-wide text-white">SD-Vault</h1>
                         <p className="mt-1 text-xs tracking-widest uppercase" style={{ color: 'var(--vault-muted)', letterSpacing: '0.15em' }}>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { CreateVaultResult, VaultMeta } from '../types';
 import { measureStrength } from '../utils/strength';
+import logoUrl from '../assets/logo.svg';
 
 interface Props {
     onCreated: (meta: VaultMeta) => void;
@@ -124,11 +125,14 @@ export default function FirstRunSetup({ onCreated }: Props) {
 
                 <div className="px-8 py-8">
                     {/* Header */}
-                    <div className="mb-7">
-                        <p className="text-xs uppercase tracking-widest mb-1" style={{ color: 'var(--vault-muted)' }}>
-                            Einrichtung
-                        </p>
-                        <h1 className="text-xl font-semibold text-white">SD-Vault erstellen</h1>
+                    <div className="flex items-center gap-3 mb-7">
+                        <img src={logoUrl} alt="SD-Vault" className="w-10 h-10 flex-shrink-0" draggable={false} />
+                        <div>
+                            <p className="text-xs uppercase tracking-widest" style={{ color: 'var(--vault-muted)' }}>
+                                Einrichtung
+                            </p>
+                            <h1 className="text-xl font-semibold text-white leading-tight">SD-Vault erstellen</h1>
+                        </div>
                     </div>
 
                     {/* Step indicator */}
