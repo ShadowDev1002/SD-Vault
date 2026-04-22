@@ -9,7 +9,6 @@ interface Props {
 
 export default function LockScreen({ onUnlocked }: Props) {
     const [masterPw, setMasterPw] = useState('');
-    const [secretKey, setSecretKey] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -18,10 +17,7 @@ export default function LockScreen({ onUnlocked }: Props) {
         setError('');
         setLoading(true);
         try {
-            const meta = await invoke<VaultMeta>('unlock_vault', {
-                masterPw,
-                secretKeyFormatted: secretKey,
-            });
+            const meta = await invoke<VaultMeta>('unlock_vault', { masterPw });
             onUnlocked(meta);
         } catch (err) {
             setError(String(err));
@@ -91,27 +87,6 @@ export default function LockScreen({ onUnlocked }: Props) {
                                 placeholder="••••••••••••"
                                 required
                                 autoFocus
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider" style={{ color: 'var(--vault-muted)' }}>
-                                Secret Key
-                            </label>
-                            <input
-                                type="text"
-                                value={secretKey}
-                                onChange={e => setSecretKey(e.target.value.toUpperCase())}
-                                className="w-full px-4 py-2.5 rounded-xl border text-white text-xs font-mono transition-colors focus:outline-none"
-                                style={{
-                                    backgroundColor: '#0d0f18',
-                                    borderColor: 'var(--vault-border)',
-                                    letterSpacing: '0.05em',
-                                }}
-                                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)')}
-                                onBlur={e => (e.currentTarget.style.borderColor = 'var(--vault-border)')}
-                                placeholder="SDVLT-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
-                                required
                             />
                         </div>
 

@@ -56,6 +56,34 @@ pub(crate) fn read_salt() -> Result<[u8; 32], String> {
     Ok(salt)
 }
 
+pub(crate) fn secret_key_path() -> Result<PathBuf, String> {
+    Ok(get_vault_dir()?.join("vault.secret"))
+}
+
+/// Speichert den Secret Key gerätebunden (chmod 600). Wird nie synchronisiert.
+pub(crate) fn write_secret_key(key_bytes: &[u8; 20]) -> Result<(), String> {
+    let path = secret_key_path()?;
+    fs::write(&path, key_bytes.as_ref()).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub(crate) fn read_secret_key() -> Result<[u8; 20], String> {
+    let bytes = fs::read(secret_key_path()?)
+        .map_err(|e| format!("vault.secret nicht gefunden: {}", e))?;
+    if bytes.len() != 20 {
+        return Err("Korrupte vault.secret Datei".into());
+    }
+    let mut key = [0u8; 20];
+    key.copy_from_slice(&bytes);
+    Ok(key)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())

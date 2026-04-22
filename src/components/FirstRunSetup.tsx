@@ -86,10 +86,7 @@ export default function FirstRunSetup({ onCreated }: Props) {
 
     async function handleFinish() {
         try {
-            const meta = await invoke<VaultMeta>('unlock_vault', {
-                masterPw,
-                secretKeyFormatted: result!.secret_key_formatted,
-            });
+            const meta = await invoke<VaultMeta>('unlock_vault', { masterPw });
             onCreated(meta);
         } catch (err) {
             setError(String(err));

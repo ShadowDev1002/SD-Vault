@@ -10,7 +10,7 @@ use crate::sync::local::LocalBackupProvider;
 use crate::sync::sftp::SftpProvider;
 use crate::sync::{BackupEntry, SyncProvider};
 
-use super::{get_vault_dir, db_path, write_salt, read_salt};
+use super::{get_vault_dir, db_path, write_salt, read_salt, write_secret_key, read_secret_key};
 
 #[tauri::command]
 pub fn vault_exists() -> bool {
@@ -38,6 +38,7 @@ pub fn create_vault(
     let (secret_key_bytes, secret_key_formatted) = crate::crypto::generate_secret_key();
     let salt = crate::crypto::generate_salt();
     write_salt(&salt)?;
+    write_secret_key(&secret_key_bytes)?;
 
     let master_key = crate::crypto::derive_master_key(&master_pw, &secret_key_bytes, &salt)?;
     let sqlcipher_key = crate::crypto::derive_sqlcipher_key(&master_key);
@@ -70,14 +71,13 @@ pub fn create_vault(
 pub fn unlock_vault(
     state: State<'_, AppState>,
     master_pw: String,
-    secret_key_formatted: String,
 ) -> Result<VaultMeta, String> {
     let db_path = db_path()?;
     if !db_path.exists() {
         return Err("Kein Vault gefunden. Bitte zuerst einen neuen Vault erstellen.".into());
     }
 
-    let secret_key_bytes = crate::crypto::parse_secret_key(&secret_key_formatted)?;
+    let secret_key_bytes = read_secret_key()?;
     let salt = read_salt()?;
     let master_key = crate::crypto::derive_master_key(&master_pw, &secret_key_bytes, &salt)?;
 
