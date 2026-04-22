@@ -124,6 +124,32 @@ pub fn parse_secret_key(formatted: &str) -> Result<[u8; 20], String> {
     Ok(arr)
 }
 
+/// Leitet einen Recovery-Schlüssel aus dem Secret Key ab.
+/// Da der Secret Key 160 Bits Entropie hat, reicht HKDF ohne Argon2.
+pub fn derive_recovery_key(secret_key: &[u8; 20]) -> Zeroizing<[u8; KEY_LEN]> {
+    let hk = Hkdf::<Sha256>::new(None, secret_key);
+    let mut okm = Zeroizing::new([0u8; KEY_LEN]);
+    hk.expand(b"sd-vault:recovery:v1", okm.as_mut())
+        .expect("HKDF expand: output length 32 always valid");
+    okm
+}
+
+/// Verschlüsselt einen 32-Byte Schlüssel mit einem anderen (Key Wrapping).
+pub fn wrap_key(wrapping_key: &[u8; KEY_LEN], key_to_wrap: &[u8; KEY_LEN]) -> Result<Vec<u8>, String> {
+    encrypt(wrapping_key, key_to_wrap.as_ref())
+}
+
+/// Entschlüsselt einen mit wrap_key gespeicherten Schlüssel.
+pub fn unwrap_key(wrapping_key: &[u8; KEY_LEN], wrapped: &[u8]) -> Result<Zeroizing<[u8; KEY_LEN]>, String> {
+    let bytes = decrypt(wrapping_key, wrapped)?;
+    if bytes.len() != KEY_LEN {
+        return Err("Ungültige Schlüssellänge nach Entschlüsselung".into());
+    }
+    let mut key = Zeroizing::new([0u8; KEY_LEN]);
+    key.as_mut().copy_from_slice(&bytes);
+    Ok(key)
+}
+
 /// Generiert einen zufälligen 32-Byte Argon2-Salt.
 pub fn generate_salt() -> [u8; 32] {
     let mut salt = [0u8; 32];

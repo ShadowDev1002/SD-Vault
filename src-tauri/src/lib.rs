@@ -60,6 +60,26 @@ pub(crate) fn secret_key_path() -> Result<PathBuf, String> {
     Ok(get_vault_dir()?.join("vault.secret"))
 }
 
+pub(crate) fn recovery_path() -> Result<PathBuf, String> {
+    Ok(get_vault_dir()?.join("vault.recovery"))
+}
+
+pub(crate) fn write_recovery_wrap(data: &[u8]) -> Result<(), String> {
+    let path = recovery_path()?;
+    fs::write(&path, data).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub(crate) fn read_recovery_wrap() -> Result<Vec<u8>, String> {
+    fs::read(recovery_path()?).map_err(|e| format!("vault.recovery nicht gefunden: {}", e))
+}
+
 /// Speichert den Secret Key gerätebunden (chmod 600). Wird nie synchronisiert.
 pub(crate) fn write_secret_key(key_bytes: &[u8; 20]) -> Result<(), String> {
     let path = secret_key_path()?;
@@ -101,6 +121,7 @@ pub fn run() {
             commands::sync_sftp,
             commands::save_sftp_config,
             commands::list_local_backups,
+            commands::reset_master_password,
         ])
         .run(tauri::generate_context!())
         .expect("SD-Vault konnte nicht gestartet werden");
