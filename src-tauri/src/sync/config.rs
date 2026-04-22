@@ -33,6 +33,13 @@ impl SyncConfig {
 
     pub fn save(&self, config_path: &Path) -> Result<(), String> {
         let content = toml::to_string_pretty(self).map_err(|e| e.to_string())?;
-        std::fs::write(config_path, content).map_err(|e| e.to_string())
+        std::fs::write(config_path, content).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::Permissions::from_mode(0o600);
+            let _ = std::fs::set_permissions(config_path, perms);
+        }
+        Ok(())
     }
 }

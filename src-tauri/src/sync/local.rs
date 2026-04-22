@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::Utc;
+use rand::Rng;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -24,7 +25,7 @@ impl LocalBackupProvider {
             .filter(|e| e.path().extension().map(|x| x == "db").unwrap_or(false))
             .filter_map(|e| {
                 let name = e.file_name().to_string_lossy().to_string();
-                let ts: i64 = name.strip_prefix("vault_")?.strip_suffix(".db")?.parse().ok()?;
+                let ts: i64 = name.strip_prefix("vault_")?.split('_').next()?.parse().ok()?;
                 Some((ts, e.path()))
             })
             .collect();
@@ -37,15 +38,24 @@ impl LocalBackupProvider {
     }
 }
 
+fn validate_id(id: &str) -> Result<(), String> {
+    if id.contains('/') || id.contains('\\') || id.contains("..") || id.is_empty() {
+        return Err("Ungültige Backup-ID".into());
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl SyncProvider for LocalBackupProvider {
     async fn upload(&self, data: &[u8], _name: &str) -> Result<(), String> {
-        let filename = format!("vault_{}.db", Utc::now().timestamp());
+        let suffix: u32 = rand::thread_rng().gen();
+        let filename = format!("vault_{}_{:08x}.db", Utc::now().timestamp(), suffix);
         fs::write(self.backup_dir.join(&filename), data).map_err(|e| e.to_string())?;
         self.prune()
     }
 
     async fn download(&self, id: &str) -> Result<Vec<u8>, String> {
+        validate_id(id)?;
         fs::read(self.backup_dir.join(id)).map_err(|e| e.to_string())
     }
 
@@ -57,7 +67,7 @@ impl SyncProvider for LocalBackupProvider {
             .filter_map(|e| {
                 let name = e.file_name().to_string_lossy().to_string();
                 let size = e.metadata().ok()?.len();
-                let ts: i64 = name.strip_prefix("vault_")?.strip_suffix(".db")?.parse().ok()?;
+                let ts: i64 = name.strip_prefix("vault_")?.split('_').next()?.parse().ok()?;
                 Some(BackupEntry { id: name, timestamp: ts, size_bytes: size })
             })
             .collect();
@@ -66,6 +76,7 @@ impl SyncProvider for LocalBackupProvider {
     }
 
     async fn delete_backup(&self, id: &str) -> Result<(), String> {
+        validate_id(id)?;
         fs::remove_file(self.backup_dir.join(id)).map_err(|e| e.to_string())
     }
 }

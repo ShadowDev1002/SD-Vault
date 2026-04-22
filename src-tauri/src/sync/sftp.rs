@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::Utc;
+use rand::Rng;
 use ssh2::Session;
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -10,11 +11,14 @@ use super::{BackupEntry, SyncProvider};
 
 pub struct SftpProvider {
     config: SftpConfig,
+    fingerprint_path: std::path::PathBuf,
 }
 
 impl SftpProvider {
-    pub fn new(config: SftpConfig) -> Self {
-        Self { config }
+    pub fn new(config: SftpConfig, vault_dir: &std::path::Path) -> Self {
+        let host_slug = config.host.replace('.', "_").replace(':', "_");
+        let fingerprint_path = vault_dir.join(format!("sftp_host_{}.fp", host_slug));
+        Self { config, fingerprint_path }
     }
 
     fn connect(&self) -> Result<Session, String> {
@@ -26,6 +30,8 @@ impl SftpProvider {
         sess.set_tcp_stream(tcp);
         sess.handshake()
             .map_err(|e| format!("SSH Handshake fehlgeschlagen: {}", e))?;
+
+        check_host_key(&sess, &self.config.host, &self.fingerprint_path)?;
 
         match &self.config.auth {
             SftpAuth::Password { password } => {
@@ -49,13 +55,54 @@ impl SftpProvider {
     }
 }
 
+fn validate_id(id: &str) -> Result<(), String> {
+    if id.contains('/') || id.contains('\\') || id.contains("..") || id.is_empty() {
+        return Err("Ungültige Backup-ID".into());
+    }
+    Ok(())
+}
+
+fn check_host_key(
+    sess: &Session,
+    _host: &str,
+    fingerprint_path: &std::path::PathBuf,
+) -> Result<(), String> {
+    let host_key = sess.host_key().ok_or("Server hat keinen Host-Key geliefert")?;
+    let fingerprint = sess
+        .host_key_hash(ssh2::HashType::Sha256)
+        .ok_or("Host-Key Hash konnte nicht berechnet werden")?;
+    let fp_hex = hex::encode(fingerprint);
+
+    if fingerprint_path.exists() {
+        let stored = std::fs::read_to_string(fingerprint_path).map_err(|e| e.to_string())?;
+        let stored = stored.trim();
+        if stored != fp_hex {
+            return Err(format!(
+                "SSH Host-Key stimmt nicht überein! Möglicher MITM-Angriff.\nGespeichert: {}\nAktuell: {}",
+                stored, fp_hex
+            ));
+        }
+    } else {
+        // Trust on first use (TOFU)
+        std::fs::write(fingerprint_path, &fp_hex).map_err(|e| e.to_string())?;
+    }
+
+    let _ = host_key; // suppress unused warning
+    Ok(())
+}
+
+// NOTE: lib.rs currently has only the minimal run() stub (no sync_sftp command),
+// so SftpProvider::new does not need updating there. When Task 7 adds the full
+// Tauri command, pass &vault_dir as the second argument to SftpProvider::new.
+
 #[async_trait]
 impl SyncProvider for SftpProvider {
     async fn upload(&self, data: &[u8], _name: &str) -> Result<(), String> {
         let sess = self.connect()?;
         let sftp = sess.sftp().map_err(|e| e.to_string())?;
         let _ = sftp.mkdir(Path::new(&self.config.remote_path), 0o755);
-        let filename = format!("vault_{}.db", Utc::now().timestamp());
+        let suffix: u32 = rand::thread_rng().gen();
+        let filename = format!("vault_{}_{:08x}.db", Utc::now().timestamp(), suffix);
         let remote = self.remote_path(&filename);
         let mut file = sftp
             .create(Path::new(&remote))
@@ -66,6 +113,7 @@ impl SyncProvider for SftpProvider {
     }
 
     async fn download(&self, id: &str) -> Result<Vec<u8>, String> {
+        validate_id(id)?;
         let sess = self.connect()?;
         let sftp = sess.sftp().map_err(|e| e.to_string())?;
         let remote = self.remote_path(id);
@@ -89,7 +137,7 @@ impl SyncProvider for SftpProvider {
             .filter(|(path, _)| path.extension().map(|x| x == "db").unwrap_or(false))
             .filter_map(|(path, stat)| {
                 let name = path.file_name()?.to_string_lossy().to_string();
-                let ts: i64 = name.strip_prefix("vault_")?.strip_suffix(".db")?.parse().ok()?;
+                let ts: i64 = name.strip_prefix("vault_")?.split('_').next()?.parse().ok()?;
                 Some(BackupEntry {
                     id: name,
                     timestamp: ts,
@@ -102,6 +150,7 @@ impl SyncProvider for SftpProvider {
     }
 
     async fn delete_backup(&self, id: &str) -> Result<(), String> {
+        validate_id(id)?;
         let sess = self.connect()?;
         let sftp = sess.sftp().map_err(|e| e.to_string())?;
         sftp.unlink(Path::new(&self.remote_path(id)))
