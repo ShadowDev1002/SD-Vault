@@ -1,17 +1,45 @@
 export type Category = 'login' | 'card' | 'note' | 'identity';
+export type FieldType = 'text' | 'password' | 'url' | 'email' | 'phone' | 'date';
 
 export interface CustomField {
+    id: string;
     label: string;
     value: string;
+    field_type: FieldType;
 }
 
 export interface ItemPayload {
+    // Universal
     title: string;
+    notes: string;
+    favorite: boolean;
+    fields: CustomField[];
+
+    // Login
     username: string;
     password: string;
     url: string;
-    notes: string;
-    fields: CustomField[];
+    totp: string;
+
+    // Card
+    cardholder: string;
+    card_number: string;
+    expiry: string;
+    cvv: string;
+    pin: string;
+
+    // Identity
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    company: string;
+    job_title: string;
+    address: string;
+    city: string;
+    zip: string;
+    country: string;
+    birthday: string;
 }
 
 export interface Item {

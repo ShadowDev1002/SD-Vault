@@ -25,19 +25,45 @@ pub struct ItemWithPayload {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ItemPayload {
+    // Universal
     pub title: String,
-    pub username: String,
-    pub password: String,
-    pub url: String,
-    pub notes: String,
-    #[serde(default)]
-    pub fields: Vec<CustomField>,
+    #[serde(default)] pub notes: String,
+    #[serde(default)] pub favorite: bool,
+    #[serde(default)] pub fields: Vec<CustomField>,
+
+    // Login
+    #[serde(default)] pub username: String,
+    #[serde(default)] pub password: String,
+    #[serde(default)] pub url: String,
+    #[serde(default)] pub totp: String,
+
+    // Card
+    #[serde(default)] pub cardholder: String,
+    #[serde(default)] pub card_number: String,
+    #[serde(default)] pub expiry: String,
+    #[serde(default)] pub cvv: String,
+    #[serde(default)] pub pin: String,
+
+    // Identity
+    #[serde(default)] pub first_name: String,
+    #[serde(default)] pub last_name: String,
+    #[serde(default)] pub email: String,
+    #[serde(default)] pub phone: String,
+    #[serde(default)] pub company: String,
+    #[serde(default)] pub job_title: String,
+    #[serde(default)] pub address: String,
+    #[serde(default)] pub city: String,
+    #[serde(default)] pub zip: String,
+    #[serde(default)] pub country: String,
+    #[serde(default)] pub birthday: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CustomField {
+    #[serde(default)] pub id: String,
     pub label: String,
     pub value: String,
+    #[serde(default)] pub field_type: String,
 }
 
 /// Öffnet (oder erstellt) eine SQLCipher-Datenbank. Der Key MUSS gesetzt werden
