@@ -1,0 +1,109 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import LockScreen from './components/LockScreen';
+import FirstRunSetup from './components/FirstRunSetup';
+import VaultView from './components/VaultView';
+import Settings from './components/Settings';
+import type { VaultMeta } from './types';
+import { APP_VERSION } from './components/Sidebar';
+import './App.css';
+
+const GITHUB_REPO = 'ShadowDev1002/SD-Vault';
+
+type AppState = 'loading' | 'first-run' | 'locked' | 'unlocked';
+
+export interface UpdateInfo {
+    version: string;
+    url: string;
+}
+
+export default function App() {
+    const [appState, setAppState] = useState<AppState>('loading');
+    const [meta, setMeta] = useState<VaultMeta | null>(null);
+    const [showSettings, setShowSettings] = useState(false);
+    const [lockTimeout, setLockTimeout] = useState(5);
+    const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+    const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        invoke<boolean>('vault_exists').then(exists => {
+            setAppState(exists ? 'locked' : 'first-run');
+        });
+    }, []);
+
+    // Automatischer Update-Check beim Start
+    useEffect(() => {
+        async function checkUpdate() {
+            try {
+                const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const remote = (data.tag_name ?? '').replace(/^v/, '');
+                if (remote && remote !== APP_VERSION) {
+                    setUpdateInfo({
+                        version: remote,
+                        url: data.html_url ?? `https://github.com/${GITHUB_REPO}/releases/latest`,
+                    });
+                }
+            } catch { /* kein Internet oder kein Release → still ignorieren */ }
+        }
+        checkUpdate();
+    }, []);
+
+    const handleLocked = useCallback(async () => {
+        if (lockTimer.current) clearTimeout(lockTimer.current);
+        await invoke('lock_vault');
+        setMeta(null);
+        setAppState('locked');
+    }, []);
+
+    const resetLockTimer = useCallback(() => {
+        if (lockTimer.current) clearTimeout(lockTimer.current);
+        lockTimer.current = setTimeout(() => handleLocked(), lockTimeout * 60 * 1000);
+    }, [lockTimeout, handleLocked]);
+
+    useEffect(() => {
+        if (appState !== 'unlocked') return;
+        const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+        events.forEach(e => window.addEventListener(e, resetLockTimer, { passive: true }));
+        resetLockTimer();
+        return () => {
+            events.forEach(e => window.removeEventListener(e, resetLockTimer));
+            if (lockTimer.current) clearTimeout(lockTimer.current);
+        };
+    }, [appState, resetLockTimer]);
+
+    function handleUnlocked(m: VaultMeta) {
+        setMeta(m);
+        setAppState('unlocked');
+    }
+
+    if (appState === 'loading') return null;
+
+    return (
+        <>
+            {appState === 'first-run' && <FirstRunSetup onCreated={handleUnlocked} />}
+            {appState === 'locked' && <LockScreen onUnlocked={handleUnlocked} />}
+            {appState === 'unlocked' && meta && (
+                <VaultView
+                    meta={meta}
+                    onLocked={handleLocked}
+                    onSettings={() => setShowSettings(true)}
+                    hasUpdate={!!updateInfo}
+                    updateInfo={updateInfo}
+                    onDismissUpdate={() => setUpdateInfo(null)}
+                />
+            )}
+            {showSettings && (
+                <Settings
+                    isUnlocked={appState === 'unlocked'}
+                    lockTimeout={lockTimeout}
+                    onTimeoutChange={setLockTimeout}
+                    onClose={() => setShowSettings(false)}
+                    onUpdateFound={(info) => setUpdateInfo(info)}
+                    updateInfo={updateInfo}
+                />
+            )}
+        </>
+    );
+}

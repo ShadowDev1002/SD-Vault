@@ -1,0 +1,53 @@
+{
+  "app-id": "de.shadowdev.sd-vault",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "48",
+  "sdk": "org.freedesktop.Sdk//24.08",
+  "command": "sd-vault",
+  "finish-args": [
+    "--share=network",
+    "--share=ipc",
+    "--socket=fallback-x11",
+    "--socket=wayland",
+    "--device=dri",
+    "--filesystem=home",
+    "--talk-name=org.freedesktop.secrets",
+    "--env=WEBKIT_DISABLE_DMABUF_RENDERER=1",
+    "--env=WEBKIT_DISABLE_COMPOSITING_MODE=1"
+  ],
+  "modules": [
+    {
+      "name": "sd-vault",
+      "buildsystem": "simple",
+      "build-commands": [
+        "install -Dm755 sd-vault /app/bin/sd-vault",
+        "install -Dm644 128x128.png /app/share/icons/hicolor/128x128/apps/de.shadowdev.sd-vault.png",
+        "install -Dm644 32x32.png /app/share/icons/hicolor/32x32/apps/de.shadowdev.sd-vault.png",
+        "install -Dm644 de.shadowdev.sd-vault.desktop /app/share/applications/de.shadowdev.sd-vault.desktop",
+        "install -Dm644 de.shadowdev.sd-vault.metainfo.xml /app/share/metainfo/de.shadowdev.sd-vault.metainfo.xml"
+      ],
+      "sources": [
+        {
+          "type": "file",
+          "path": "../src-tauri/target/release/sd-vault"
+        },
+        {
+          "type": "file",
+          "path": "../src-tauri/icons/128x128.png"
+        },
+        {
+          "type": "file",
+          "path": "../src-tauri/icons/32x32.png"
+        },
+        {
+          "type": "file",
+          "path": "de.shadowdev.sd-vault.desktop"
+        },
+        {
+          "type": "file",
+          "path": "de.shadowdev.sd-vault.metainfo.xml"
+        }
+      ]
+    }
+  ]
+}

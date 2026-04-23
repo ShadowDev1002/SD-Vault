@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+release/
+
+# Tauri build
+src-tauri/target/
+src-tauri/WixTools/
+
+# Flatpak build
+flatpak-build/
+flatpak-repo/
+.flatpak-builder/
+
+# Vault data (never commit these)
+*.vault
+*.sdpx
+vault.db
+vault.secret
+vault.salt
+vault.recovery
+vault.kdf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Local config
+.env
+.env.local
+
+# NSIS build artifacts
+build/windows/*.exe

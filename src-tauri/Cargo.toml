@@ -1,0 +1,38 @@
+[package]
+name = "sd-vault"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sd_vault_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.31", features = ["bundled-sqlcipher-vendored-openssl"] }
+argon2 = "0.5"
+aes-gcm = "0.10"
+blake3 = "1"
+hkdf = "0.12"
+sha2 = "0.10"
+zeroize = { version = "1", features = ["derive"] }
+ssh2 = "0.9"
+dirs = "5"
+uuid = { version = "1", features = ["v4"] }
+tokio = { version = "1", features = ["full"] }
+printpdf = "0.7"
+base32 = "0.4"
+rand = "0.8"
+async-trait = "0.1"
+hex = "0.4"
+toml = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+open = "5"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+zip = { version = "2", features = ["deflate"] }

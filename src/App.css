@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Apple Dark Mode Design System ─── */
+:root {
+    --bg:        #000000;
+    --surface:   #1c1c1e;
+    --surface-2: #2c2c2e;
+    --surface-3: #3a3a3c;
+    --border:    rgba(255,255,255,0.1);
+    --border-2:  rgba(255,255,255,0.06);
+    --accent:    #0a84ff;
+    --accent-glow: rgba(10,132,255,0.25);
+    --text:      #f5f5f7;
+    --text-2:    rgba(235,235,245,0.6);
+    --text-3:    rgba(235,235,245,0.3);
+    --danger:    #ff453a;
+    --success:   #32d74b;
+    --warning:   #ffd60a;
+
+    /* Legacy aliases */
+    --vault-bg:      var(--bg);
+    --vault-surface: var(--surface);
+    --vault-border:  var(--border);
+    --vault-accent:  var(--accent);
+    --vault-danger:  var(--danger);
+    --vault-muted:   var(--text-2);
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-size: 14px;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar            { width: 5px; height: 5px; }
+::-webkit-scrollbar-track      { background: transparent; }
+::-webkit-scrollbar-thumb      { background: var(--surface-3); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+/* ─── Animations ─── */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(24px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.93); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+    50%       { box-shadow: 0 0 0 6px transparent; }
+}
+
+/* Utility animation classes */
+.anim-fade-in      { animation: fadeIn       0.25s ease both; }
+.anim-slide-up     { animation: slideUp      0.5s  cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-slide-down   { animation: slideDown    0.3s  cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-scale-in     { animation: scaleIn      0.3s  cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-slide-right  { animation: slideInRight 0.3s  cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Stagger helpers (set on children via inline style) */
+.anim-stagger > *:nth-child(1)  { animation-delay: 0.04s; }
+.anim-stagger > *:nth-child(2)  { animation-delay: 0.08s; }
+.anim-stagger > *:nth-child(3)  { animation-delay: 0.12s; }
+.anim-stagger > *:nth-child(4)  { animation-delay: 0.16s; }
+.anim-stagger > *:nth-child(5)  { animation-delay: 0.20s; }
+
+/* ─── Apple-style glass card ─── */
+.glass-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow:
+        0 40px 80px rgba(0,0,0,0.6),
+        0 0 0 0.5px rgba(255,255,255,0.06) inset;
+}
+
+/* ─── Inputs ─── */
+.sd-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+}
+
+.sd-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.sd-input::placeholder { color: var(--text-3); }
+
+/* ─── Buttons ─── */
+.sd-btn-primary {
+    width: 100%;
+    padding: 11px 20px;
+    background: var(--accent);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+}
+
+.sd-btn-primary:hover:not(:disabled)  { opacity: 0.88; }
+.sd-btn-primary:active:not(:disabled) { transform: scale(0.98); }
+.sd-btn-primary:disabled              { opacity: 0.4; cursor: not-allowed; }
+
+/* ─── Top shimmer line on cards ─── */
+.card-top-line {
+    height: 1px;
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+}

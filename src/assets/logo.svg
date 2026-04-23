@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="shieldGrad" x1="10" y1="5" x2="90" y2="97" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a5b4fc"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#4338ca" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Shield body -->
+  <path
+    d="M50 6 L88 21 L88 54 Q88 78 50 95 Q12 78 12 54 L12 21 Z"
+    fill="url(#shieldGrad)"
+    filter="url(#shadow)"
+  />
+
+  <!-- Inner shield highlight (subtle lighter edge at top) -->
+  <path
+    d="M50 12 L82 25 L82 54 Q82 74 50 89 Q18 74 18 54 L18 25 Z"
+    fill="none"
+    stroke="rgba(255,255,255,0.15)"
+    stroke-width="1.5"
+  />
+
+  <!-- Lock shackle -->
+  <path
+    d="M37 47 L37 39 Q37 27 50 27 Q63 27 63 39 L63 47"
+    stroke="white"
+    stroke-width="6"
+    fill="none"
+    stroke-linecap="round"
+    opacity="0.95"
+  />
+
+  <!-- Lock body -->
+  <rect x="33" y="45" width="34" height="25" rx="5" fill="white" opacity="0.93"/>
+
+  <!-- Keyhole circle -->
+  <circle cx="50" cy="55.5" r="5" fill="#6366f1"/>
+
+  <!-- Keyhole stem -->
+  <rect x="47.5" y="55" width="5" height="8" rx="1.5" fill="#6366f1"/>
+</svg>
