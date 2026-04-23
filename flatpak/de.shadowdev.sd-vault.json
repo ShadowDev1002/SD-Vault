@@ -11,7 +11,9 @@
     "--socket=wayland",
     "--device=dri",
     "--filesystem=home",
-    "--talk-name=org.freedesktop.secrets"
+    "--talk-name=org.freedesktop.secrets",
+    "--env=WEBKIT_DISABLE_DMABUF_RENDERER=1",
+    "--env=WEBKIT_DISABLE_COMPOSITING_MODE=1"
   ],
   "modules": [
     {
