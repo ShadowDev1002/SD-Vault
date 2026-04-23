@@ -1,11 +1,12 @@
 import logoUrl from '../assets/logo.svg';
 import type { Category } from '../types';
 
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.2.0';
+export type ViewCategory = Category | 'all' | 'health';
 
 interface Props {
-    activeCategory: Category | 'all';
-    onCategoryChange: (cat: Category | 'all') => void;
+    activeCategory: ViewCategory;
+    onCategoryChange: (cat: ViewCategory) => void;
     search: string;
     onSearchChange: (s: string) => void;
     onLock: () => void;
@@ -13,12 +14,13 @@ interface Props {
     hasUpdate?: boolean;
 }
 
-const CATEGORIES: { key: Category | 'all'; label: string; icon: JSX.Element }[] = [
+const CATEGORIES: { key: ViewCategory; label: string; icon: JSX.Element }[] = [
     { key: 'all',      label: 'Alle Einträge', icon: <AllIcon /> },
     { key: 'login',    label: 'Logins',        icon: <KeyIcon /> },
     { key: 'card',     label: 'Karten',        icon: <CardIcon /> },
     { key: 'note',     label: 'Notizen',       icon: <NoteIcon /> },
     { key: 'identity', label: 'Identitäten',   icon: <UserIcon /> },
+    { key: 'health',   label: 'Passwort-Check', icon: <HealthIcon /> },
 ];
 
 export default function Sidebar({ activeCategory, onCategoryChange, search, onSearchChange, onLock, onSettings, hasUpdate }: Props) {
@@ -139,6 +141,13 @@ function UserIcon() {
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
             <circle cx="8" cy="5" r="3" />
             <path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" strokeLinecap="round" />
+        </svg>
+    );
+}
+function HealthIcon() {
+    return (
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M8 14s-6-3.8-6-8a4 4 0 018 0 4 4 0 018 0c0 4.2-6 8-6 8z" strokeLinejoin="round" />
         </svg>
     );
 }
