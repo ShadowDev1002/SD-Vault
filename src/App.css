@@ -28,6 +28,41 @@
     --vault-muted:   var(--text-2);
 }
 
+/* ─── Light Mode ─── */
+:root.light {
+    --bg:          #f2f2f7;
+    --surface:     #ffffff;
+    --surface-2:   #f2f2f7;
+    --surface-3:   #e5e5ea;
+    --border:      rgba(0,0,0,0.1);
+    --border-2:    rgba(0,0,0,0.06);
+    --accent:      #007aff;
+    --accent-glow: rgba(0,122,255,0.18);
+    --text:        #1c1c1e;
+    --text-2:      rgba(60,60,67,0.6);
+    --text-3:      rgba(60,60,67,0.3);
+    --danger:      #ff3b30;
+    --success:     #34c759;
+    --warning:     #ff9500;
+
+    --vault-bg:      var(--bg);
+    --vault-surface: var(--surface);
+    --vault-border:  var(--border);
+    --vault-accent:  var(--accent);
+    --vault-danger:  var(--danger);
+    --vault-muted:   var(--text-2);
+}
+
+:root.light .glass-card {
+    box-shadow:
+        0 20px 40px rgba(0,0,0,0.12),
+        0 0 0 0.5px rgba(0,0,0,0.06) inset;
+}
+
+:root.light .card-top-line {
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.06), transparent);
+}
+
 * { box-sizing: border-box; }
 
 body {
@@ -38,6 +73,7 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-size: 14px;
+    transition: background-color 0.2s, color 0.2s;
 }
 
 /* ─── Scrollbar ─── */

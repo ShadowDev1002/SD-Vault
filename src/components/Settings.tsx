@@ -5,6 +5,7 @@ import SecuritySettings from './SecuritySettings';
 import SyncSettings from './SyncSettings';
 import { APP_VERSION } from './Sidebar';
 import type { UpdateInfo } from '../App';
+import type { Theme } from '../utils/theme';
 
 const GITHUB_REPO = 'ShadowDev1002/SD-Vault';
 
@@ -18,6 +19,10 @@ interface Props {
     onClose: () => void;
     onUpdateFound?: (info: UpdateInfo) => void;
     updateInfo?: UpdateInfo | null;
+    theme: Theme;
+    onThemeChange: (t: Theme) => void;
+    accent: string;
+    onAccentChange: (color: string) => void;
 }
 
 const NAV: { id: Tab; label: string; icon: JSX.Element }[] = [
@@ -26,7 +31,7 @@ const NAV: { id: Tab; label: string; icon: JSX.Element }[] = [
     { id: 'about',    label: 'Über die App',  icon: <InfoIcon /> },
 ];
 
-export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onClose, onUpdateFound, updateInfo: externalUpdateInfo }: Props) {
+export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onClose, onUpdateFound, updateInfo: externalUpdateInfo, theme, onThemeChange, accent, onAccentChange }: Props) {
     const [tab, setTab] = useState<Tab>('security');
     const [updateState, setUpdateState] = useState<UpdateState>(externalUpdateInfo ? 'available' : 'idle');
     const [latestVersion, setLatestVersion] = useState(externalUpdateInfo?.version ?? '');
@@ -105,7 +110,7 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
                     {/* Content */}
                     <div className="flex-1 p-6 overflow-y-auto">
                         {tab === 'security' && (
-                            <SecuritySettings lockTimeout={lockTimeout} onTimeoutChange={onTimeoutChange} />
+                            <SecuritySettings lockTimeout={lockTimeout} onTimeoutChange={onTimeoutChange} theme={theme} onThemeChange={onThemeChange} accent={accent} onAccentChange={onAccentChange} />
                         )}
                         {tab === 'sync' && (
                             <SyncSettings isUnlocked={isUnlocked} />

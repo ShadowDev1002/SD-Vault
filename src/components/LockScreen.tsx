@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { VaultMeta } from '../types';
 import logoUrl from '../assets/logo.svg';
@@ -17,27 +17,49 @@ function Spinner() {
 }
 
 export default function LockScreen({ onUnlocked }: Props) {
-    const [mode, setMode] = useState<'unlock' | 'reset' | 'reset-done'>('unlock');
+    const [mode, setMode] = useState<'unlock' | 'reset' | 'reset-done' | 'hard-locked'>('unlock');
 
-    const [masterPw, setMasterPw]         = useState('');
-    const [unlockError, setUnlockError]   = useState('');
+    const [masterPw, setMasterPw]           = useState('');
+    const [unlockError, setUnlockError]     = useState('');
     const [unlockLoading, setUnlockLoading] = useState(false);
+    const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
-    const [secretKey, setSecretKey]     = useState('');
-    const [newPw, setNewPw]             = useState('');
-    const [confirmPw, setConfirmPw]     = useState('');
-    const [resetError, setResetError]   = useState('');
+    useEffect(() => {
+        if (lockoutSeconds <= 0) return;
+        const id = setTimeout(() => setLockoutSeconds(s => s - 1), 1000);
+        return () => clearTimeout(id);
+    }, [lockoutSeconds]);
+
+    const [secretKey, setSecretKey]       = useState('');
+    const [newPw, setNewPw]               = useState('');
+    const [confirmPw, setConfirmPw]       = useState('');
+    const [resetError, setResetError]     = useState('');
     const [resetLoading, setResetLoading] = useState(false);
+
+    const [lockKey, setLockKey]           = useState('');
+    const [lockKeyError, setLockKeyError] = useState('');
+    const [lockKeyLoading, setLockKeyLoading] = useState(false);
 
     async function handleUnlock(e: React.FormEvent) {
         e.preventDefault();
+        if (lockoutSeconds > 0) return;
         setUnlockError('');
         setUnlockLoading(true);
         try {
             const meta = await invoke<VaultMeta>('unlock_vault', { masterPw });
             onUnlocked(meta);
         } catch (err) {
-            setUnlockError(String(err));
+            const msg = String(err);
+            if (msg === 'HARD_LOCKED') {
+                setMode('hard-locked');
+                setUnlockError('');
+            } else if (msg.startsWith('LOCKOUT:')) {
+                const secs = parseInt(msg.split(':')[1], 10);
+                setLockoutSeconds(secs);
+                setUnlockError('');
+            } else {
+                setUnlockError(msg);
+            }
         } finally {
             setUnlockLoading(false);
         }
@@ -56,6 +78,21 @@ export default function LockScreen({ onUnlocked }: Props) {
             setResetError(String(err));
         } finally {
             setResetLoading(false);
+        }
+    }
+
+    async function handleUnlockLock(e: React.FormEvent) {
+        e.preventDefault();
+        setLockKeyError('');
+        setLockKeyLoading(true);
+        try {
+            await invoke('reset_lockout_with_key', { secretKeyFormatted: lockKey });
+            setMode('unlock');
+            setLockKey('');
+        } catch (err) {
+            setLockKeyError(String(err));
+        } finally {
+            setLockKeyLoading(false);
         }
     }
 
@@ -83,7 +120,10 @@ export default function LockScreen({ onUnlocked }: Props) {
                         </div>
                         <h1 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--text)' }}>SD-Vault</h1>
                         <p className="mt-1 text-xs uppercase tracking-widest" style={{ color: 'var(--text-3)', letterSpacing: '0.14em' }}>
-                            {mode === 'unlock' ? 'Sicherer Zugang' : mode === 'reset' ? 'Passwort zurücksetzen' : 'Erfolgreich'}
+                            {mode === 'unlock' ? 'Sicherer Zugang'
+                                : mode === 'reset' ? 'Passwort zurücksetzen'
+                                : mode === 'hard-locked' ? 'Vault gesperrt'
+                                : 'Erfolgreich'}
                         </p>
                     </div>
 
@@ -102,10 +142,19 @@ export default function LockScreen({ onUnlocked }: Props) {
 
                             {unlockError && <ErrorBox>{unlockError}</ErrorBox>}
 
-                            <button type="submit" disabled={unlockLoading} className="sd-btn-primary">
+                            {lockoutSeconds > 0 && (
+                                <div className="px-3 py-2.5 rounded-xl text-xs text-center"
+                                    style={{ background: 'rgba(255,69,58,0.08)', border: '1px solid rgba(255,69,58,0.2)', color: '#ff6b63' }}>
+                                    Zu viele Fehlversuche. Bitte warte <strong>{lockoutSeconds}s</strong>.
+                                </div>
+                            )}
+
+                            <button type="submit" disabled={unlockLoading || lockoutSeconds > 0} className="sd-btn-primary">
                                 {unlockLoading
                                     ? <span className="flex items-center justify-center gap-2"><Spinner />Entsperren…</span>
-                                    : 'Vault entsperren'}
+                                    : lockoutSeconds > 0
+                                        ? `Gesperrt (${lockoutSeconds}s)`
+                                        : 'Vault entsperren'}
                             </button>
 
                             <button
@@ -163,6 +212,31 @@ export default function LockScreen({ onUnlocked }: Props) {
                                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-2)')}
                                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
                             >← Zurück</button>
+                        </form>
+                    )}
+
+                    {/* ── Hard locked ── */}
+                    {mode === 'hard-locked' && (
+                        <form onSubmit={handleUnlockLock} className="space-y-3 anim-slide-down">
+                            <div className="px-3 py-2.5 rounded-xl text-xs leading-relaxed"
+                                style={{ background: 'rgba(255,69,58,0.08)', border: '1px solid rgba(255,69,58,0.25)', color: '#ff6b63' }}>
+                                Zu viele Fehlversuche. Der Vault ist dauerhaft gesperrt.
+                                Gib deinen Secret Key aus dem Emergency Kit ein, um die Sperre aufzuheben.
+                            </div>
+                            <input
+                                type="text"
+                                value={lockKey}
+                                onChange={e => setLockKey(e.target.value.toUpperCase())}
+                                className="sd-input font-mono text-xs"
+                                placeholder="SDVLT-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
+                                required autoFocus
+                            />
+                            {lockKeyError && <ErrorBox>{lockKeyError}</ErrorBox>}
+                            <button type="submit" disabled={lockKeyLoading} className="sd-btn-primary">
+                                {lockKeyLoading
+                                    ? <span className="flex items-center justify-center gap-2"><Spinner />Prüfe…</span>
+                                    : 'Sperre aufheben'}
+                            </button>
                         </form>
                     )}
 

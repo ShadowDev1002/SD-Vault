@@ -6,6 +6,7 @@ import VaultView from './components/VaultView';
 import Settings from './components/Settings';
 import type { VaultMeta } from './types';
 import { APP_VERSION } from './components/Sidebar';
+import { getTheme, applyTheme, type Theme, getAccentColor, applyAccentColor } from './utils/theme';
 import './App.css';
 
 const GITHUB_REPO = 'ShadowDev1002/SD-Vault';
@@ -23,7 +24,19 @@ export default function App() {
     const [showSettings, setShowSettings] = useState(false);
     const [lockTimeout, setLockTimeout] = useState(5);
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+    const [theme, setTheme] = useState<Theme>(getTheme);
+    const [accent, setAccent] = useState<string>(getAccentColor);
     const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    function handleThemeChange(t: Theme) {
+        applyTheme(t);
+        setTheme(t);
+    }
+
+    function handleAccentChange(color: string) {
+        applyAccentColor(color);
+        setAccent(color);
+    }
 
     useEffect(() => {
         invoke<boolean>('vault_exists').then(exists => {
@@ -102,6 +115,10 @@ export default function App() {
                     onClose={() => setShowSettings(false)}
                     onUpdateFound={(info) => setUpdateInfo(info)}
                     updateInfo={updateInfo}
+                    theme={theme}
+                    onThemeChange={handleThemeChange}
+                    accent={accent}
+                    onAccentChange={handleAccentChange}
                 />
             )}
         </>
