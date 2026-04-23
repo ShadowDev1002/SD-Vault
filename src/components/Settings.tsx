@@ -4,8 +4,8 @@ import logoUrl from '../assets/logo.svg';
 import SecuritySettings from './SecuritySettings';
 import SyncSettings from './SyncSettings';
 import { APP_VERSION } from './Sidebar';
+import type { UpdateInfo } from '../App';
 
-// Set this to your GitHub repo slug: "username/repo-name"
 const GITHUB_REPO = 'ShadowDev1002/SD-Vault';
 
 type Tab = 'security' | 'sync' | 'about';
@@ -16,7 +16,8 @@ interface Props {
     lockTimeout: number;
     onTimeoutChange: (minutes: number) => void;
     onClose: () => void;
-    onUpdateFound?: () => void;
+    onUpdateFound?: (info: UpdateInfo) => void;
+    updateInfo?: UpdateInfo | null;
 }
 
 const NAV: { id: Tab; label: string; icon: JSX.Element }[] = [
@@ -25,11 +26,11 @@ const NAV: { id: Tab; label: string; icon: JSX.Element }[] = [
     { id: 'about',    label: 'Über die App',  icon: <InfoIcon /> },
 ];
 
-export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onClose, onUpdateFound }: Props) {
+export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onClose, onUpdateFound, updateInfo: externalUpdateInfo }: Props) {
     const [tab, setTab] = useState<Tab>('security');
-    const [updateState, setUpdateState] = useState<UpdateState>('idle');
-    const [latestVersion, setLatestVersion] = useState('');
-    const [releaseUrl, setReleaseUrl] = useState('');
+    const [updateState, setUpdateState] = useState<UpdateState>(externalUpdateInfo ? 'available' : 'idle');
+    const [latestVersion, setLatestVersion] = useState(externalUpdateInfo?.version ?? '');
+    const [releaseUrl, setReleaseUrl] = useState(externalUpdateInfo?.url ?? '');
 
     async function checkForUpdate() {
         setUpdateState('checking');
@@ -38,11 +39,12 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
             if (!res.ok) throw new Error();
             const data = await res.json();
             const remote = (data.tag_name ?? '').replace(/^v/, '');
+            const url = data.html_url ?? `https://github.com/${GITHUB_REPO}/releases/latest`;
             setLatestVersion(remote);
-            setReleaseUrl(data.html_url ?? `https://github.com/${GITHUB_REPO}/releases/latest`);
+            setReleaseUrl(url);
             if (remote && remote !== APP_VERSION) {
                 setUpdateState('available');
-                onUpdateFound?.();
+                onUpdateFound?.({ version: remote, url });
             } else {
                 setUpdateState('up-to-date');
             }

@@ -5,22 +5,49 @@ import FirstRunSetup from './components/FirstRunSetup';
 import VaultView from './components/VaultView';
 import Settings from './components/Settings';
 import type { VaultMeta } from './types';
+import { APP_VERSION } from './components/Sidebar';
 import './App.css';
 
+const GITHUB_REPO = 'ShadowDev1002/SD-Vault';
+
 type AppState = 'loading' | 'first-run' | 'locked' | 'unlocked';
+
+export interface UpdateInfo {
+    version: string;
+    url: string;
+}
 
 export default function App() {
     const [appState, setAppState] = useState<AppState>('loading');
     const [meta, setMeta] = useState<VaultMeta | null>(null);
     const [showSettings, setShowSettings] = useState(false);
     const [lockTimeout, setLockTimeout] = useState(5);
-    const [hasUpdate, setHasUpdate] = useState(false);
+    const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         invoke<boolean>('vault_exists').then(exists => {
             setAppState(exists ? 'locked' : 'first-run');
         });
+    }, []);
+
+    // Automatischer Update-Check beim Start
+    useEffect(() => {
+        async function checkUpdate() {
+            try {
+                const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const remote = (data.tag_name ?? '').replace(/^v/, '');
+                if (remote && remote !== APP_VERSION) {
+                    setUpdateInfo({
+                        version: remote,
+                        url: data.html_url ?? `https://github.com/${GITHUB_REPO}/releases/latest`,
+                    });
+                }
+            } catch { /* kein Internet oder kein Release → still ignorieren */ }
+        }
+        checkUpdate();
     }, []);
 
     const handleLocked = useCallback(async () => {
@@ -62,7 +89,9 @@ export default function App() {
                     meta={meta}
                     onLocked={handleLocked}
                     onSettings={() => setShowSettings(true)}
-                    hasUpdate={hasUpdate}
+                    hasUpdate={!!updateInfo}
+                    updateInfo={updateInfo}
+                    onDismissUpdate={() => setUpdateInfo(null)}
                 />
             )}
             {showSettings && (
@@ -71,7 +100,8 @@ export default function App() {
                     lockTimeout={lockTimeout}
                     onTimeoutChange={setLockTimeout}
                     onClose={() => setShowSettings(false)}
-                    onUpdateFound={() => setHasUpdate(true)}
+                    onUpdateFound={(info) => setUpdateInfo(info)}
+                    updateInfo={updateInfo}
                 />
             )}
         </>
