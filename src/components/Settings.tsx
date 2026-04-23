@@ -6,7 +6,7 @@ import SyncSettings from './SyncSettings';
 import { APP_VERSION } from './Sidebar';
 
 // Set this to your GitHub repo slug: "username/repo-name"
-const GITHUB_REPO = 'ShadowDev/sd-vault';
+const GITHUB_REPO = 'ShadowDev1002/SD-Vault';
 
 type Tab = 'security' | 'sync' | 'about';
 type UpdateState = 'idle' | 'checking' | 'up-to-date' | 'available' | 'error';
