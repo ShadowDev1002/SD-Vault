@@ -4,6 +4,7 @@ use zeroize::Zeroize;
 use crate::db::{ItemPayload, ItemWithPayload, VaultMeta};
 use crate::AppState;
 use std::fs;
+use std::io::{Read, Write};
 use tauri::State;
 
 use crate::sync::config::{SftpConfig, SyncConfig};
@@ -438,6 +439,63 @@ pub fn export_entry_pdf(
     doc.save(&mut std::io::BufWriter::new(
         fs::File::create(&save_path).map_err(|e| e.to_string())?
     )).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Exportiert den gesamten Vault als .sdpx-Datei (ZIP mit allen nötigen Vault-Dateien).
+/// Die vault.db ist bereits AES-256-GCM-verschlüsselt; vault.secret + vault.salt werden mitgepackt.
+/// Der Empfänger braucht das Master-Passwort um den Vault zu entschlüsseln.
+#[tauri::command]
+pub fn export_vault(save_path: String) -> Result<(), String> {
+    let vault_dir = get_vault_dir()?;
+
+    let files = [
+        ("vault.db",       vault_dir.join("vault.db")),
+        ("vault.secret",   vault_dir.join("vault.secret")),
+        ("vault.salt",     vault_dir.join("vault.salt")),
+        ("vault.recovery", vault_dir.join("vault.recovery")),
+        ("vault.kdf",      vault_dir.join("vault.kdf")),
+    ];
+
+    let out_file = fs::File::create(&save_path).map_err(|e| e.to_string())?;
+    let mut zip = zip::ZipWriter::new(out_file);
+    let opts = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+
+    for (name, path) in &files {
+        if !path.exists() { continue; }
+        let data = fs::read(path).map_err(|e| format!("{name}: {e}"))?;
+        zip.start_file(*name, opts).map_err(|e| e.to_string())?;
+        zip.write_all(&data).map_err(|e| e.to_string())?;
+    }
+
+    zip.finish().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Importiert einen Vault aus einer .sdpx-Datei. Überschreibt keinen bestehenden Vault.
+#[tauri::command]
+pub fn import_vault(sdpx_path: String) -> Result<(), String> {
+    let vault_dir = get_vault_dir()?;
+
+    if vault_dir.join("vault.db").exists() {
+        return Err("Es existiert bereits ein Vault. Bitte zuerst die App zurücksetzen.".into());
+    }
+
+    let file = fs::File::open(&sdpx_path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
+        let name = entry.name().to_string();
+        let allowed = ["vault.db", "vault.secret", "vault.salt", "vault.recovery", "vault.kdf"];
+        if !allowed.contains(&name.as_str()) { continue; }
+
+        let mut data = Vec::new();
+        entry.read_to_end(&mut data).map_err(|e| e.to_string())?;
+        fs::write(vault_dir.join(&name), &data).map_err(|e| e.to_string())?;
+    }
 
     Ok(())
 }

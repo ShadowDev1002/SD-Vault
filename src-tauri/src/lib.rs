@@ -168,6 +168,8 @@ pub fn run() {
             commands::get_attachment_data,
             commands::delete_attachment,
             commands::export_entry_pdf,
+            commands::export_vault,
+            commands::import_vault,
         ])
         .run(tauri::generate_context!())
         .expect("SD-Vault konnte nicht gestartet werden");

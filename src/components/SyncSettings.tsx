@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { save, open } from '@tauri-apps/plugin-dialog';
 import type { BackupEntry, SftpConfig } from '../types';
 
 interface Props {
@@ -26,6 +27,29 @@ export default function SyncSettings({ isUnlocked }: Props) {
     const [webdavUser, setWebdavUser] = useState('');
     const [webdavPass, setWebdavPass] = useState('');
     const [webdavMsg, setWebdavMsg] = useState('');
+
+    // Export / Import state
+    const [transferMsg, setTransferMsg] = useState('');
+
+    async function handleExportVault() {
+        setTransferMsg('');
+        const path = await save({ filters: [{ name: 'SD-Vault Backup', extensions: ['sdpx'] }], defaultPath: 'SD-Vault-Backup.sdpx' });
+        if (!path) return;
+        try {
+            await invoke('export_vault', { savePath: path });
+            setTransferMsg('✓ Vault exportiert – Datei sicher aufbewahren!');
+        } catch (err) { setTransferMsg('Fehler: ' + String(err)); }
+    }
+
+    async function handleImportVault() {
+        setTransferMsg('');
+        const path = await open({ filters: [{ name: 'SD-Vault Backup', extensions: ['sdpx'] }] });
+        if (!path) return;
+        try {
+            await invoke('import_vault', { sdpxPath: typeof path === 'string' ? path : path[0] });
+            setTransferMsg('✓ Vault importiert – App neu starten um ihn zu öffnen.');
+        } catch (err) { setTransferMsg('Fehler: ' + String(err)); }
+    }
 
     async function handleLocalBackup() {
         setLoadingBackup(true);
@@ -87,6 +111,32 @@ export default function SyncSettings({ isUnlocked }: Props) {
 
     return (
         <div className="space-y-6">
+            {/* Vault Migration */}
+            <section className="space-y-3">
+                <h3 className="text-sm font-semibold text-white">Vault-Migration (Neuer PC)</h3>
+                <p className="text-xs" style={{ color: 'var(--vault-muted)' }}>
+                    Exportiere deinen Vault als <strong style={{ color: 'var(--vault-fg)' }}>.sdpx</strong>-Datei
+                    und importiere sie auf dem neuen PC. Du brauchst danach nur noch dein <strong style={{ color: 'var(--vault-fg)' }}>Master-Passwort</strong>.
+                </p>
+                <div className="flex gap-2">
+                    <button onClick={handleExportVault}
+                        className="px-4 py-2 rounded-lg text-sm text-white"
+                        style={{ backgroundColor: 'var(--vault-accent)' }}>
+                        Vault exportieren (.sdpx)
+                    </button>
+                    <button onClick={handleImportVault}
+                        className="px-4 py-2 rounded-lg text-sm border"
+                        style={{ borderColor: 'var(--vault-border)', color: 'var(--vault-muted)' }}>
+                        Vault importieren (.sdpx)
+                    </button>
+                </div>
+                {transferMsg && (
+                    <p className="text-sm" style={{ color: transferMsg.startsWith('✓') ? '#22c55e' : 'var(--vault-danger)' }}>
+                        {transferMsg}
+                    </p>
+                )}
+            </section>
+
             {/* Local Backup */}
             <section className="space-y-3">
                 <h3 className="text-sm font-semibold text-white">Lokales Backup</h3>
