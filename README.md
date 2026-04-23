@@ -50,6 +50,14 @@ pnpm tauri build
 
 - [Tauri v2](https://tauri.app) · [React](https://react.dev) · [SQLCipher](https://www.zetetic.net/sqlcipher/)
 
+## Haftungsausschluss
+
+SD-Vault wird **so wie es ist** bereitgestellt — ohne jegliche ausdrückliche oder stillschweigende Garantie.
+
+Der Entwickler übernimmt **keinerlei Haftung** für Datenverlust, Schäden durch Sicherheitslücken, Abstürze, fehlerhafte Backups oder Folgeschäden jeglicher Art, die durch die Nutzung dieser Software entstehen.
+
+Die Sicherheit des Vaults hängt maßgeblich von der Stärke des Master-Passworts und dem sicheren Aufbewahren des Emergency Kits ab. Der Quellcode ist auf GitHub einsehbar und prüfbar.
+
 ## License
 
 MIT

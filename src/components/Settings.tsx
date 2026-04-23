@@ -177,6 +177,21 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
 
                                 <div className="border-t" style={{ borderColor: 'var(--border)' }} />
 
+                                {/* Disclaimer */}
+                                <div className="rounded-lg p-4 border space-y-2 text-xs leading-relaxed"
+                                    style={{ borderColor: 'var(--border)', backgroundColor: 'rgba(255,255,255,0.03)', color: 'var(--text-2)' }}>
+                                    <p className="font-semibold text-white">Haftungsausschluss</p>
+                                    <p>
+                                        SD-Vault wird <em>so wie es ist</em> bereitgestellt — ohne jegliche Garantie.
+                                        Der Entwickler haftet nicht für Datenverlust, Sicherheitslücken oder sonstige Schäden,
+                                        die durch die Nutzung dieser Software entstehen.
+                                    </p>
+                                    <p>
+                                        Die Sicherheit hängt von der Stärke deines Master-Passworts und dem sicheren Aufbewahren
+                                        des Emergency Kits ab. Quellcode einsehbar auf GitHub (MIT-Lizenz).
+                                    </p>
+                                </div>
+
                                 {/* Links */}
                                 <div className="space-y-2">
                                     <h4 className="text-sm font-semibold text-white">Links</h4>

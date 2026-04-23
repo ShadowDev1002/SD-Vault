@@ -32,10 +32,11 @@ function WarningIcon() {
     );
 }
 
-const STEPS = ['Passwort', 'Emergency Kit', 'Fertig'];
+const STEPS = ['Haftung', 'Passwort', 'Emergency Kit', 'Fertig'];
 
 export default function FirstRunSetup({ onCreated }: Props) {
-    const [step, setStep] = useState<1 | 2 | 3>(1);
+    const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
+    const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
     const [masterPw, setMasterPw] = useState('');
     const [confirmPw, setConfirmPw] = useState('');
     const [error, setError] = useState('');
@@ -135,9 +136,9 @@ export default function FirstRunSetup({ onCreated }: Props) {
                     {/* Step indicator */}
                     <div className="flex items-center mb-8">
                         {STEPS.map((label, idx) => {
+                            const isComplete = step > idx;
+                            const isActive = step === idx;
                             const n = idx + 1;
-                            const isComplete = step > n;
-                            const isActive = step === n;
                             return (
                                 <div key={n} className="flex items-center flex-1 last:flex-none">
                                     <div className="flex flex-col items-center">
@@ -158,16 +159,72 @@ export default function FirstRunSetup({ onCreated }: Props) {
                                             {label}
                                         </span>
                                     </div>
-                                    {n < STEPS.length && (
+                                    {idx < STEPS.length - 1 && (
                                         <div
                                             className="h-px flex-1 mx-2 mb-4"
-                                            style={{ backgroundColor: step > n ? 'var(--vault-accent)' : 'var(--vault-border)' }}
+                                            style={{ backgroundColor: step > idx ? 'var(--vault-accent)' : 'var(--vault-border)' }}
                                         />
                                     )}
                                 </div>
                             );
                         })}
                     </div>
+
+                    {/* Step 0: Disclaimer */}
+                    {step === 0 && (
+                        <div className="space-y-5">
+                            <div className="rounded-xl border p-5 space-y-4 text-sm leading-relaxed"
+                                style={{ borderColor: 'var(--vault-border)', backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                                <h2 className="text-base font-semibold text-white">Haftungsausschluss</h2>
+                                <p style={{ color: 'var(--vault-muted)' }}>
+                                    SD-Vault wird <strong className="text-white">so wie es ist</strong> bereitgestellt — ohne jegliche ausdrückliche oder stillschweigende Garantie.
+                                </p>
+                                <p style={{ color: 'var(--vault-muted)' }}>
+                                    Der Entwickler übernimmt <strong className="text-white">keinerlei Haftung</strong> für:
+                                </p>
+                                <ul className="space-y-1.5 list-none" style={{ color: 'var(--vault-muted)' }}>
+                                    {[
+                                        'Verlust, Diebstahl oder Kompromittierung gespeicherter Daten',
+                                        'Schäden durch Sicherheitslücken in verwendeten Bibliotheken',
+                                        'Datenverlust durch Fehler, Abstürze oder fehlerhafte Backups',
+                                        'Folgeschäden jeglicher Art durch die Nutzung dieser Software',
+                                        'Schäden durch unsachgemäße Verwendung oder schwache Master-Passwörter',
+                                    ].map(item => (
+                                        <li key={item} className="flex items-start gap-2">
+                                            <span className="mt-0.5 shrink-0" style={{ color: 'var(--vault-danger)' }}>—</span>
+                                            <span>{item}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <p style={{ color: 'var(--vault-muted)' }}>
+                                    Die Sicherheit des Vaults hängt maßgeblich von der <strong className="text-white">Stärke deines Master-Passworts</strong> und dem <strong className="text-white">sicheren Aufbewahren des Emergency Kits</strong> ab.
+                                    SD-Vault ist <strong className="text-white">Open-Source</strong> — du kannst den Quellcode jederzeit auf GitHub einsehen und prüfen.
+                                </p>
+                                <p className="text-xs" style={{ color: 'var(--vault-muted)' }}>
+                                    Lizenz: MIT · GitHub: github.com/ShadowDev1002/SD-Vault
+                                </p>
+                            </div>
+                            <label className="flex items-start gap-3 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={disclaimerAccepted}
+                                    onChange={e => setDisclaimerAccepted(e.target.checked)}
+                                    className="mt-0.5 w-4 h-4 rounded shrink-0 accent-blue-500"
+                                />
+                                <span className="text-sm" style={{ color: 'var(--vault-muted)' }}>
+                                    Ich habe den Haftungsausschluss gelesen und akzeptiere ihn.
+                                </span>
+                            </label>
+                            <button
+                                onClick={() => setStep(1)}
+                                disabled={!disclaimerAccepted}
+                                className="w-full py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40 transition-opacity"
+                                style={{ backgroundColor: 'var(--vault-accent)' }}
+                            >
+                                Akzeptieren & Vault erstellen
+                            </button>
+                        </div>
+                    )}
 
                     {/* Step 1: Master Password */}
                     {step === 1 && (
