@@ -9,12 +9,14 @@ use rusqlite::Connection;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Instant;
 use zeroize::Zeroizing;
 
 pub struct AppState {
     pub master_key: Mutex<Option<Zeroizing<[u8; 32]>>>,
     pub db_conn: Mutex<Option<Connection>>,
     pub vault_dir: Mutex<Option<PathBuf>>,
+    pub lockout_until: Mutex<Option<Instant>>,
 }
 
 impl Default for AppState {
@@ -23,6 +25,7 @@ impl Default for AppState {
             master_key: Mutex::new(None),
             db_conn: Mutex::new(None),
             vault_dir: Mutex::new(None),
+            lockout_until: Mutex::new(None),
         }
     }
 }
@@ -98,6 +101,21 @@ pub(crate) fn read_kdf_params() -> KdfParams {
     }
 }
 
+pub(crate) fn attempts_path() -> Result<PathBuf, String> {
+    Ok(get_vault_dir()?.join("vault.attempts"))
+}
+
+pub(crate) fn read_failed_attempts() -> u32 {
+    attempts_path()
+        .and_then(|p| fs::read_to_string(p).map_err(|e| e.to_string()))
+        .and_then(|s| s.trim().parse::<u32>().map_err(|e| e.to_string()))
+        .unwrap_or(0)
+}
+
+pub(crate) fn write_failed_attempts(n: u32) -> Result<(), String> {
+    fs::write(attempts_path()?, n.to_string()).map_err(|e| e.to_string())
+}
+
 pub(crate) fn recovery_path() -> Result<PathBuf, String> {
     Ok(get_vault_dir()?.join("vault.recovery"))
 }
@@ -170,6 +188,8 @@ pub fn run() {
             commands::export_entry_pdf,
             commands::export_vault,
             commands::import_vault,
+            commands::reset_lockout_with_key,
+            commands::move_item_category,
         ])
         .run(tauri::generate_context!())
         .expect("SD-Vault konnte nicht gestartet werden");

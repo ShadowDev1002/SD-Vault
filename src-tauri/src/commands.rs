@@ -5,6 +5,7 @@ use crate::db::{ItemPayload, ItemWithPayload, VaultMeta};
 use crate::AppState;
 use std::fs;
 use std::io::{Read, Write};
+use std::time::{Duration, Instant};
 use tauri::State;
 
 use crate::sync::config::{SftpConfig, SyncConfig};
@@ -91,6 +92,27 @@ pub async fn unlock_vault(
     state: State<'_, AppState>,
     master_pw: String,
 ) -> Result<VaultMeta, String> {
+    use super::{read_failed_attempts, write_failed_attempts};
+
+    // Permanente Sperre prüfen (>= 10 Versuche, persistent)
+    let attempts = read_failed_attempts();
+    if attempts >= 10 {
+        return Err("HARD_LOCKED".to_string());
+    }
+
+    // Zeitbasierte Sperre prüfen (In-Memory)
+    {
+        let until_opt = *state.lockout_until.lock().unwrap();
+        if let Some(until) = until_opt {
+            let now = Instant::now();
+            if now < until {
+                let secs = (until - now).as_secs() + 1;
+                return Err(format!("LOCKOUT:{}", secs));
+            }
+            *state.lockout_until.lock().unwrap() = None;
+        }
+    }
+
     let db_path = db_path()?;
     if !db_path.exists() {
         return Err("Kein Vault gefunden. Bitte zuerst einen neuen Vault erstellen.".into());
@@ -100,29 +122,69 @@ pub async fn unlock_vault(
     let salt = read_salt()?;
     let kdf = read_kdf_params();
 
-    // Argon2id auf Blocking-Thread
     let master_key = tokio::task::spawn_blocking(move || {
         crate::crypto::derive_master_key(&master_pw, &secret_key_bytes, &salt,
                                          kdf.mem_kb, kdf.ops, kdf.threads)
     }).await.map_err(|e| e.to_string())??;
 
     let sqlcipher_key = crate::crypto::derive_sqlcipher_key(&*master_key);
-    let conn = crate::db::open_db(&db_path, &*sqlcipher_key)?;
-    let meta = crate::db::read_vault_meta(&conn)?;
+    match crate::db::open_db(&db_path, &*sqlcipher_key) {
+        Ok(conn) => {
+            let meta = crate::db::read_vault_meta(&conn)?;
 
-    // Migration: Recovery-Datei erstellen falls noch nicht vorhanden
-    if !super::recovery_path()?.exists() {
-        let sk = read_secret_key()?;
-        let recovery_key = crate::crypto::derive_recovery_key(&sk);
-        let wrapped = crate::crypto::wrap_key(&recovery_key, &*master_key)?;
-        write_recovery_wrap(&wrapped)?;
+            if !super::recovery_path()?.exists() {
+                let sk = read_secret_key()?;
+                let recovery_key = crate::crypto::derive_recovery_key(&sk);
+                let wrapped = crate::crypto::wrap_key(&recovery_key, &*master_key)?;
+                write_recovery_wrap(&wrapped)?;
+            }
+
+            *state.master_key.lock().unwrap() = Some(master_key);
+            *state.db_conn.lock().unwrap() = Some(conn);
+            *state.vault_dir.lock().unwrap() = Some(get_vault_dir()?);
+            *state.lockout_until.lock().unwrap() = None;
+            let _ = write_failed_attempts(0);
+
+            Ok(meta)
+        }
+        Err(_) => {
+            let new_attempts = attempts + 1;
+            let _ = write_failed_attempts(new_attempts);
+
+            if new_attempts >= 10 {
+                return Err("HARD_LOCKED".to_string());
+            }
+
+            if new_attempts >= 5 {
+                let lockout_secs = 30u64 * 2u64.pow(((new_attempts / 5) - 1).min(8));
+                *state.lockout_until.lock().unwrap() =
+                    Some(Instant::now() + Duration::from_secs(lockout_secs));
+                return Err(format!("LOCKOUT:{}", lockout_secs));
+            }
+
+            let remaining = 5 - new_attempts;
+            Err(format!(
+                "Falsches Master-Passwort. Noch {} Versuch{}.",
+                remaining,
+                if remaining == 1 { "" } else { "e" }
+            ))
+        }
     }
+}
 
-    *state.master_key.lock().unwrap() = Some(master_key);
-    *state.db_conn.lock().unwrap() = Some(conn);
-    *state.vault_dir.lock().unwrap() = Some(get_vault_dir()?);
-
-    Ok(meta)
+#[tauri::command]
+pub async fn reset_lockout_with_key(
+    state: State<'_, AppState>,
+    secret_key_formatted: String,
+) -> Result<(), String> {
+    let provided = crate::crypto::parse_secret_key(&secret_key_formatted)?;
+    let stored = read_secret_key()?;
+    if provided != stored {
+        return Err("Ungültiger Secret Key — stimmt nicht mit diesem Vault überein.".into());
+    }
+    super::write_failed_attempts(0)?;
+    *state.lockout_until.lock().unwrap() = None;
+    Ok(())
 }
 
 #[tauri::command]
@@ -234,6 +296,21 @@ pub fn delete_item(state: State<'_, AppState>, id: String) -> Result<(), String>
     let conn_guard = state.db_conn.lock().unwrap();
     let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
     crate::db::delete_item(conn, &id)
+}
+
+#[tauri::command]
+pub fn move_item_category(
+    state: State<'_, AppState>,
+    id: String,
+    category: String,
+) -> Result<(), String> {
+    let conn_guard = state.db_conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    conn.execute(
+        "UPDATE items SET category = ?1 WHERE id = ?2",
+        rusqlite::params![category, id],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
