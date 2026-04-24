@@ -9,7 +9,7 @@ use rusqlite::Connection;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use zeroize::Zeroizing;
 
 pub struct AppState {
@@ -114,6 +114,37 @@ pub(crate) fn read_failed_attempts() -> u32 {
 
 pub(crate) fn write_failed_attempts(n: u32) -> Result<(), String> {
     fs::write(attempts_path()?, n.to_string()).map_err(|e| e.to_string())
+}
+
+pub(crate) fn lockout_path() -> Result<PathBuf, String> {
+    Ok(get_vault_dir()?.join("vault.lockout"))
+}
+
+pub(crate) fn write_lockout_until(until_unix: u64) -> Result<(), String> {
+    fs::write(lockout_path()?, until_unix.to_string()).map_err(|e| e.to_string())
+}
+
+pub(crate) fn clear_lockout_file() {
+    if let Ok(path) = lockout_path() {
+        let _ = fs::remove_file(path);
+    }
+}
+
+/// Liest den persistierten Lockout-Zeitstempel und gibt einen Instant zurück,
+/// falls die Sperre noch aktiv ist.
+pub(crate) fn read_lockout_until() -> Option<Instant> {
+    let path = lockout_path().ok()?;
+    let content = fs::read_to_string(path).ok()?;
+    let until_unix: u64 = content.trim().parse().ok()?;
+    let now_unix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+    if until_unix <= now_unix {
+        return None;
+    }
+    let remaining = Duration::from_secs(until_unix - now_unix);
+    Some(Instant::now() + remaining)
 }
 
 pub(crate) fn recovery_path() -> Result<PathBuf, String> {

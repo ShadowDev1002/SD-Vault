@@ -5,7 +5,7 @@ use crate::db::{ItemPayload, ItemWithPayload, VaultMeta};
 use crate::AppState;
 use std::fs;
 use std::io::{Read, Write};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::State;
 
 use crate::sync::config::{SftpConfig, SyncConfig};
@@ -94,22 +94,33 @@ pub async fn unlock_vault(
 ) -> Result<VaultMeta, String> {
     use super::{read_failed_attempts, write_failed_attempts};
 
+    // Bereits entsperrt? Metadaten direkt zurückgeben.
+    if state.master_key.lock().unwrap().is_some() {
+        let conn_guard = state.db_conn.lock().unwrap();
+        let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+        return crate::db::read_vault_meta(conn);
+    }
+
     // Permanente Sperre prüfen (>= 10 Versuche, persistent)
     let attempts = read_failed_attempts();
     if attempts >= 10 {
         return Err("HARD_LOCKED".to_string());
     }
 
-    // Zeitbasierte Sperre prüfen (In-Memory)
+    // Zeitbasierte Sperre prüfen (In-Memory, ggf. von Disk wiederherstellen)
     {
-        let until_opt = *state.lockout_until.lock().unwrap();
-        if let Some(until) = until_opt {
+        let mut until_opt = state.lockout_until.lock().unwrap();
+        if until_opt.is_none() {
+            *until_opt = super::read_lockout_until();
+        }
+        if let Some(until) = *until_opt {
             let now = Instant::now();
             if now < until {
                 let secs = (until - now).as_secs() + 1;
                 return Err(format!("LOCKOUT:{}", secs));
             }
-            *state.lockout_until.lock().unwrap() = None;
+            *until_opt = None;
+            super::clear_lockout_file();
         }
     }
 
@@ -118,7 +129,7 @@ pub async fn unlock_vault(
         return Err("Kein Vault gefunden. Bitte zuerst einen neuen Vault erstellen.".into());
     }
 
-    let secret_key_bytes = read_secret_key()?;
+    let mut secret_key_bytes = read_secret_key()?;
     let salt = read_salt()?;
     let kdf = read_kdf_params();
 
@@ -127,14 +138,17 @@ pub async fn unlock_vault(
                                          kdf.mem_kb, kdf.ops, kdf.threads)
     }).await.map_err(|e| e.to_string())??;
 
+    secret_key_bytes.zeroize();
+
     let sqlcipher_key = crate::crypto::derive_sqlcipher_key(&*master_key);
     match crate::db::open_db(&db_path, &*sqlcipher_key) {
         Ok(conn) => {
             let meta = crate::db::read_vault_meta(&conn)?;
 
             if !super::recovery_path()?.exists() {
-                let sk = read_secret_key()?;
+                let mut sk = read_secret_key()?;
                 let recovery_key = crate::crypto::derive_recovery_key(&sk);
+                sk.zeroize();
                 let wrapped = crate::crypto::wrap_key(&recovery_key, &*master_key)?;
                 write_recovery_wrap(&wrapped)?;
             }
@@ -143,6 +157,7 @@ pub async fn unlock_vault(
             *state.db_conn.lock().unwrap() = Some(conn);
             *state.vault_dir.lock().unwrap() = Some(get_vault_dir()?);
             *state.lockout_until.lock().unwrap() = None;
+            super::clear_lockout_file();
             let _ = write_failed_attempts(0);
 
             Ok(meta)
@@ -157,8 +172,16 @@ pub async fn unlock_vault(
 
             if new_attempts >= 5 {
                 let lockout_secs = 30u64 * 2u64.pow(((new_attempts / 5) - 1).min(8));
-                *state.lockout_until.lock().unwrap() =
-                    Some(Instant::now() + Duration::from_secs(lockout_secs));
+                let until = Instant::now() + Duration::from_secs(lockout_secs);
+                *state.lockout_until.lock().unwrap() = Some(until);
+
+                // Lockout auf Disk persistieren — überlebt App-Neustart
+                let now_unix = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                let _ = super::write_lockout_until(now_unix + lockout_secs);
+
                 return Err(format!("LOCKOUT:{}", lockout_secs));
             }
 
@@ -184,6 +207,7 @@ pub async fn reset_lockout_with_key(
     }
     super::write_failed_attempts(0)?;
     *state.lockout_until.lock().unwrap() = None;
+    super::clear_lockout_file();
     Ok(())
 }
 
@@ -356,8 +380,20 @@ pub fn open_url(url: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn sync_webdav(state: State<'_, AppState>) -> Result<(), String> {
     let vault_dir = state.vault_dir.lock().unwrap().clone().ok_or("Vault ist gesperrt")?;
+
+    let config_key = {
+        let key_guard = state.master_key.lock().unwrap();
+        let master_key = key_guard.as_ref().ok_or("Vault ist gesperrt")?;
+        crate::crypto::derive_config_key(master_key)
+    };
+
     let config = crate::sync::config::SyncConfig::load(&vault_dir.join("sync_config.toml"))?;
-    let webdav_config = config.webdav.ok_or("Keine WebDAV-Konfiguration gefunden")?;
+    let mut webdav_config = config.webdav.ok_or("Keine WebDAV-Konfiguration gefunden")?;
+
+    if webdav_config.password.starts_with("ENC:") {
+        webdav_config.password = crate::crypto::decrypt_config_field(&*config_key, &webdav_config.password)?;
+    }
+
     let data = fs::read(vault_dir.join("vault.db")).map_err(|e| e.to_string())?;
     crate::sync::webdav::WebDavProvider::new(webdav_config)
         .upload(&data, "vault.db")
@@ -370,9 +406,28 @@ pub fn save_webdav_config(
     webdav_config: crate::sync::config::WebDavConfig,
 ) -> Result<(), String> {
     let vault_dir = state.vault_dir.lock().unwrap().clone().ok_or("Vault ist gesperrt")?;
+
+    let config_key = {
+        let key_guard = state.master_key.lock().unwrap();
+        let master_key = key_guard.as_ref().ok_or("Vault ist gesperrt")?;
+        crate::crypto::derive_config_key(master_key)
+    };
+
     let config_path = vault_dir.join("sync_config.toml");
     let mut config = crate::sync::config::SyncConfig::load(&config_path).unwrap_or_default();
-    config.webdav = Some(webdav_config);
+
+    let mut to_save = webdav_config;
+    if !to_save.password.is_empty() && !to_save.password.starts_with("ENC:") {
+        // Passwort verschlüsseln bevor es auf Disk landet
+        to_save.password = crate::crypto::encrypt_config_field(&*config_key, &to_save.password)?;
+    } else if to_save.password.is_empty() {
+        // Kein neues Passwort → bestehendes beibehalten
+        if let Some(ref existing) = config.webdav {
+            to_save.password = existing.password.clone();
+        }
+    }
+
+    config.webdav = Some(to_save);
     config.save(&config_path)
 }
 
@@ -395,13 +450,24 @@ pub fn add_attachment(
     data: Vec<u8>,
 ) -> Result<String, String> {
     if data.len() > 10 * 1024 * 1024 {
-        return Err("Anhang zu groß (max. 10 MB)".into());
+        return Err("Anhang zu groß (max. 10 MB pro Datei)".into());
     }
     let key_guard = state.master_key.lock().unwrap();
     let master_key = key_guard.as_ref().ok_or("Vault ist gesperrt")?;
     let entry_key = crate::crypto::derive_entry_key(master_key);
     let conn_guard = state.db_conn.lock().unwrap();
     let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+
+    // Gesamt-Quota prüfen (100 MB über alle Anhänge)
+    let total_size: i64 = conn.query_row(
+        "SELECT COALESCE(SUM(size), 0) FROM attachments",
+        [],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+    if total_size as usize + data.len() > 100 * 1024 * 1024 {
+        return Err("Anhang-Kontingent überschritten (max. 100 MB gesamt)".into());
+    }
+
     crate::db::insert_attachment(conn, &entry_key, &item_id, &name, &mime, &data)
 }
 
@@ -524,8 +590,11 @@ pub fn export_entry_pdf(
 /// Die vault.db ist bereits AES-256-GCM-verschlüsselt; vault.secret + vault.salt werden mitgepackt.
 /// Der Empfänger braucht das Master-Passwort um den Vault zu entschlüsseln.
 #[tauri::command]
-pub fn export_vault(save_path: String) -> Result<(), String> {
-    let vault_dir = get_vault_dir()?;
+pub fn export_vault(state: State<'_, AppState>, save_path: String) -> Result<(), String> {
+    // Nur erlauben wenn Vault entsperrt ist
+    let vault_dir = state.vault_dir.lock().unwrap()
+        .clone()
+        .ok_or("Vault ist gesperrt — bitte erst entsperren")?;
 
     let files = [
         ("vault.db",       vault_dir.join("vault.db")),

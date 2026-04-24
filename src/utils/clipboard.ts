@@ -1,14 +1,20 @@
 let clipboardTimer: ReturnType<typeof setTimeout> | null = null;
 
 export async function copyToClipboard(text: string): Promise<void> {
-    await navigator.clipboard.writeText(text);
+    try {
+        await navigator.clipboard.writeText(text);
+    } catch {
+        return;
+    }
 
     if (clipboardTimer !== null) {
         clearTimeout(clipboardTimer);
     }
 
     clipboardTimer = setTimeout(async () => {
-        await navigator.clipboard.writeText('');
+        try {
+            await navigator.clipboard.writeText('');
+        } catch { /* ignore — clipboard unavailable */ }
         clipboardTimer = null;
     }, 30_000);
 }

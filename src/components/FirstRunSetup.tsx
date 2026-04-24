@@ -80,7 +80,8 @@ export default function FirstRunSetup({ onCreated }: Props) {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        URL.revokeObjectURL(url);
+        setResult(null); // PDF-Bytes sofort aus dem Speicher entfernen
         setPdfSaved(true);
         setStep(3);
     }

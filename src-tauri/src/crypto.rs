@@ -159,3 +159,27 @@ pub fn generate_salt() -> [u8; 32] {
     OsRng.fill_bytes(&mut salt);
     salt
 }
+
+/// Leitet einen Konfigurations-Verschlüsselungs-Key via HKDF-SHA256 ab.
+pub fn derive_config_key(master_key: &[u8; KEY_LEN]) -> Zeroizing<[u8; KEY_LEN]> {
+    let hk = Hkdf::<Sha256>::new(None, master_key);
+    let mut okm = Zeroizing::new([0u8; KEY_LEN]);
+    hk.expand(b"sd-vault:config:v1", okm.as_mut())
+        .expect("HKDF expand: output length 32 always valid");
+    okm
+}
+
+/// Verschlüsselt ein Config-Feld mit AES-256-GCM. Gibt "ENC:<hex>" zurück.
+pub fn encrypt_config_field(key: &[u8; KEY_LEN], value: &str) -> Result<String, String> {
+    let encrypted = encrypt(key, value.as_bytes())?;
+    Ok(format!("ENC:{}", hex::encode(&encrypted)))
+}
+
+/// Entschlüsselt ein "ENC:<hex>" Config-Feld.
+pub fn decrypt_config_field(key: &[u8; KEY_LEN], value: &str) -> Result<String, String> {
+    let hex_str = value.strip_prefix("ENC:")
+        .ok_or("Konfigurationsfeld ist nicht verschlüsselt")?;
+    let bytes = hex::decode(hex_str).map_err(|e| e.to_string())?;
+    let plain = decrypt(key, &bytes)?;
+    String::from_utf8(plain).map_err(|e| e.to_string())
+}

@@ -8,12 +8,19 @@ export async function checkHibp(password: string): Promise<number> {
     const prefix = hex.slice(0, 5);
     const suffix = hex.slice(5);
 
-    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
-        headers: { 'Add-Padding': 'true' },
-    });
-    if (!res.ok) throw new Error('HIBP API nicht erreichbar');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
-    const text = await res.text();
-    const line = text.split('\r\n').find(l => l.startsWith(suffix));
-    return line ? parseInt(line.split(':')[1], 10) : 0;
+    try {
+        const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+            headers: { 'Add-Padding': 'true' },
+            signal: controller.signal,
+        });
+        if (!res.ok) throw new Error('HIBP API nicht erreichbar');
+        const text = await res.text();
+        const line = text.split('\r\n').find(l => l.startsWith(suffix));
+        return line ? parseInt(line.split(':')[1], 10) : 0;
+    } finally {
+        clearTimeout(timeout);
+    }
 }
