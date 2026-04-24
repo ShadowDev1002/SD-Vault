@@ -191,6 +191,7 @@ pub(crate) fn read_secret_key() -> Result<[u8; 20], String> {
     Ok(key)
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
