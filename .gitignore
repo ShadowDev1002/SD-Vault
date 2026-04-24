@@ -1,5 +1,8 @@
 .worktrees/
 .claude/
+CLAUDE.md
+.claudeignore
+docs/superpowers/
 node_modules/
 dist/
 target/
