@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import logoUrl from '../assets/logo.svg';
 import SecuritySettings from './SecuritySettings';
+import AppearanceSettings from './AppearanceSettings';
 import SyncSettings from './SyncSettings';
 import { APP_VERSION } from './Sidebar';
 import type { UpdateInfo } from '../App';
@@ -9,7 +10,7 @@ import type { Theme } from '../utils/theme';
 
 const GITHUB_REPO = 'ShadowDev1002/SD-Vault';
 
-type Tab = 'security' | 'sync' | 'about';
+type Tab = 'security' | 'appearance' | 'sync' | 'about';
 type UpdateState = 'idle' | 'checking' | 'up-to-date' | 'available' | 'error';
 
 interface Props {
@@ -26,9 +27,10 @@ interface Props {
 }
 
 const NAV: { id: Tab; label: string; icon: JSX.Element }[] = [
-    { id: 'security', label: 'Sicherheit',    icon: <ShieldIcon /> },
-    { id: 'sync',     label: 'Synchronisation', icon: <SyncIcon /> },
-    { id: 'about',    label: 'Über die App',  icon: <InfoIcon /> },
+    { id: 'security',   label: 'Sicherheit',    icon: <ShieldIcon /> },
+    { id: 'appearance', label: 'Anpassung',     icon: <PaletteIcon /> },
+    { id: 'sync',       label: 'Synchronisation', icon: <SyncIcon /> },
+    { id: 'about',      label: 'Über die App',  icon: <InfoIcon /> },
 ];
 
 export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onClose, onUpdateFound, updateInfo: externalUpdateInfo, theme, onThemeChange, accent, onAccentChange }: Props) {
@@ -110,7 +112,10 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
                     {/* Content */}
                     <div className="flex-1 p-6 overflow-y-auto">
                         {tab === 'security' && (
-                            <SecuritySettings lockTimeout={lockTimeout} onTimeoutChange={onTimeoutChange} theme={theme} onThemeChange={onThemeChange} accent={accent} onAccentChange={onAccentChange} />
+                            <SecuritySettings lockTimeout={lockTimeout} onTimeoutChange={onTimeoutChange} />
+                        )}
+                        {tab === 'appearance' && (
+                            <AppearanceSettings theme={theme} onThemeChange={onThemeChange} accent={accent} onAccentChange={onAccentChange} />
                         )}
                         {tab === 'sync' && (
                             <SyncSettings isUnlocked={isUnlocked} />
@@ -227,6 +232,17 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
                 </div>
             </div>
         </div>
+    );
+}
+
+function PaletteIcon() {
+    return (
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="8" cy="8" r="6.5" />
+            <circle cx="5.5" cy="6" r="1" fill="currentColor" stroke="none" />
+            <circle cx="10.5" cy="6" r="1" fill="currentColor" stroke="none" />
+            <circle cx="8" cy="10.5" r="1" fill="currentColor" stroke="none" />
+        </svg>
     );
 }
 

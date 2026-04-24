@@ -1,7 +1,7 @@
 import logoUrl from '../assets/logo.svg';
 import type { Category } from '../types';
 
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.0.1';
 export type ViewCategory = Category | 'all' | 'health';
 
 interface Props {
