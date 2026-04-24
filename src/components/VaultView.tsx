@@ -5,11 +5,13 @@ import type { UpdateInfo } from '../App';
 import type { ViewCategory } from './Sidebar';
 import type { SortOption } from './EntryList';
 import Sidebar from './Sidebar';
+import BottomNav from './BottomNav';
 import EntryList from './EntryList';
 import EntryDetail from './EntryDetail';
 import QuickSearch from './QuickSearch';
 import HealthDashboard from './HealthDashboard';
 import { measureStrength } from '../utils/strength';
+import { useMobile } from '../utils/mobile';
 
 interface Props {
     meta: VaultMeta;
@@ -21,11 +23,13 @@ interface Props {
 }
 
 export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate, updateInfo, onDismissUpdate }: Props) {
+    const isMobile = useMobile();
     const [items, setItems] = useState<Item[]>([]);
     const [activeCategory, setActiveCategory] = useState<ViewCategory>('all');
     const [search, setSearch] = useState('');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isNew, setIsNew] = useState(false);
+    const [mobilePanel, setMobilePanel] = useState<'list' | 'detail'>('list');
     const [showQuickSearch, setShowQuickSearch] = useState(false);
     const [sort, setSort] = useState<SortOption>(() =>
         (localStorage.getItem('sd-sort') as SortOption) ?? 'alpha-asc'
@@ -113,41 +117,136 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
 
     const selectedItem = items.find(i => i.id === selectedId) ?? null;
 
-    function handleSaved() { setIsNew(false); loadItems(); }
-    function handleDeleted() { setSelectedId(null); setIsNew(false); loadItems(); }
+    function handleSaved() { setIsNew(false); loadItems(); if (isMobile) setMobilePanel('list'); }
+    function handleDeleted() { setSelectedId(null); setIsNew(false); loadItems(); if (isMobile) setMobilePanel('list'); }
+
+    function handleSelectEntry(id: string) {
+        setSelectedId(id);
+        setIsNew(false);
+        if (isMobile) setMobilePanel('detail');
+    }
+
+    function handleAddEntry() {
+        setSelectedId(null);
+        setIsNew(true);
+        if (isMobile) setMobilePanel('detail');
+    }
+
+    function handleBackToList() {
+        setMobilePanel('list');
+        setIsNew(false);
+    }
 
     function handleCategoryChange(cat: ViewCategory) {
         setActiveCategory(cat);
         setSelectedId(null);
         setIsNew(false);
         setSelectedIds(new Set());
+        if (isMobile) setMobilePanel('list');
     }
 
     const newCategory: Category = (activeCategory === 'all' || activeCategory === 'health')
         ? 'login'
         : activeCategory;
 
+    const updateBanner = updateInfo && (
+        <div className="flex items-center justify-between px-4 py-2 shrink-0 text-sm"
+            style={{ backgroundColor: '#1d4ed8', color: 'white' }}>
+            <span>
+                <strong>Update: v{updateInfo.version}</strong>
+                {!isMobile && ' — Neue Version auf GitHub verfügbar.'}
+            </span>
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={() => invoke('open_url', { url: updateInfo.url }).catch(() => {})}
+                    className="px-3 py-1 rounded-md text-xs font-semibold"
+                    style={{ backgroundColor: 'white', color: '#1d4ed8' }}
+                >
+                    Download
+                </button>
+                <button onClick={onDismissUpdate} className="opacity-70 text-base leading-none">×</button>
+            </div>
+        </div>
+    );
+
+    if (isMobile) {
+        return (
+            <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: 'var(--vault-bg)' }}>
+                {updateBanner}
+
+                {/* Mobile top bar */}
+                <div className="flex items-center gap-2 px-4 py-2 shrink-0 border-b" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
+                    {mobilePanel === 'detail' && (
+                        <button
+                            onClick={handleBackToList}
+                            className="flex items-center gap-1 mr-1 py-1 pr-2"
+                            style={{ color: 'var(--accent)' }}
+                        >
+                            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            <span className="text-sm">Zurück</span>
+                        </button>
+                    )}
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Suchen..."
+                        className="flex-1 px-3 py-2 text-sm rounded-xl border"
+                        style={{ backgroundColor: 'var(--surface-2)', borderColor: 'var(--border)', color: 'var(--text)', outline: 'none' }}
+                    />
+                </div>
+
+                {/* Mobile panels */}
+                <div className="flex-1 min-h-0 overflow-hidden" style={{ paddingBottom: '56px' }}>
+                    {mobilePanel === 'list' && (
+                        activeCategory === 'health' ? (
+                            <HealthDashboard
+                                items={items}
+                                onSelect={id => { setSelectedId(id); setActiveCategory('all'); setMobilePanel('detail'); }}
+                            />
+                        ) : (
+                            <EntryList
+                                items={sorted}
+                                selectedId={selectedId}
+                                onSelect={handleSelectEntry}
+                                onAdd={handleAddEntry}
+                                sort={sort}
+                                onSortChange={handleSortChange}
+                                selectedIds={selectedIds}
+                                onToggleSelect={handleToggleSelect}
+                                onBulkDelete={handleBulkDelete}
+                                onBulkMove={handleBulkMove}
+                            />
+                        )
+                    )}
+                    {mobilePanel === 'detail' && (
+                        <EntryDetail
+                            item={isNew ? null : selectedItem}
+                            onSaved={handleSaved}
+                            onDeleted={handleDeleted}
+                            onCancel={handleBackToList}
+                            isNew={isNew}
+                            newCategory={newCategory}
+                        />
+                    )}
+                </div>
+
+                <BottomNav
+                    activeCategory={activeCategory}
+                    onCategoryChange={handleCategoryChange}
+                    onSettings={onSettings}
+                    onLock={handleLock}
+                    hasUpdate={hasUpdate}
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: 'var(--vault-bg)' }}>
-            {updateInfo && (
-                <div className="flex items-center justify-between px-4 py-2 shrink-0 text-sm"
-                    style={{ backgroundColor: '#1d4ed8', color: 'white' }}>
-                    <span>
-                        <strong>Update verfügbar: v{updateInfo.version}</strong>
-                        {' '}— Neue Version auf GitHub verfügbar.
-                    </span>
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => invoke('open_url', { url: updateInfo.url }).catch(() => {})}
-                            className="px-3 py-1 rounded-md text-xs font-semibold"
-                            style={{ backgroundColor: 'white', color: '#1d4ed8' }}
-                        >
-                            Herunterladen
-                        </button>
-                        <button onClick={onDismissUpdate} className="opacity-70 hover:opacity-100 text-base leading-none">×</button>
-                    </div>
-                </div>
-            )}
+            {updateBanner}
             <div className="flex flex-1 min-h-0">
                 <Sidebar
                     activeCategory={activeCategory}
