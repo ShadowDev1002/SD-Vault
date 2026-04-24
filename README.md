@@ -1,42 +1,59 @@
 # SD-Vault
 
-Secure password manager built with Tauri v2 – AES-256-GCM, TOTP, WebDAV sync.
+Secure password manager built with Tauri v2 — AES-256-GCM encryption, SQLCipher backend, multi-platform sync.
 
 ## Features
 
 - **AES-256-GCM** encryption with SQLCipher database
+- **Dual-key security** — master password + secret key (BLAKE3 → Argon2id)
 - **TOTP** two-factor code generator
 - **Have I Been Pwned** breach check
-- **WebDAV / SFTP** sync
+- **WebDAV / SFTP / Google Drive** sync
 - **Drag & Drop** encrypted attachments
 - **PDF export** for individual entries
+- **Emergency Kit** — printable recovery document
 - Quick search (Ctrl+K)
-- Import/Export (.sdpx, Bitwarden CSV)
+- Import / Export (.sdpx, Bitwarden CSV)
 - Password generator (classic + EFF passphrase)
+- Dark/Light theme + accent color
 
 ## Download
 
+Latest release: **v1.0.1**
+
 | Platform | File |
 |----------|------|
-| Linux (AppImage) | `SD-Vault_0.1.0_amd64.AppImage` |
-| Linux (Flatpak) | `SD-Vault_0.1.0.flatpak` |
-| Windows | `SD-Vault_0.1.0_x64-setup.exe` |
+| Windows | `SD-Vault_1.0.1_x64-setup.exe` |
+| Linux (AppImage) | `SD-Vault_1.0.1_amd64.AppImage` |
+| Linux (Flatpak) | `sd-vault_1.0.1.flatpak` |
+| Linux (DEB) | `SD-Vault_1.0.1_amd64.deb` |
+| Linux (RPM) | `SD-Vault-1.0.1-1.x86_64.rpm` |
 
 ## Installation
 
+**Windows** — Run `SD-Vault_1.0.1_x64-setup.exe`
+
 **AppImage**
 ```sh
-chmod +x SD-Vault_0.1.0_amd64.AppImage
-./SD-Vault_0.1.0_amd64.AppImage
+chmod +x SD-Vault_1.0.1_amd64.AppImage
+./SD-Vault_1.0.1_amd64.AppImage
 ```
 
 **Flatpak**
 ```sh
-flatpak install SD-Vault_0.1.0.flatpak
+flatpak install sd-vault_1.0.1.flatpak
 flatpak run de.shadowdev.sd-vault
 ```
 
-**Windows** — Doppelklick auf `SD-Vault_0.1.0_x64-setup.exe`
+**DEB**
+```sh
+sudo dpkg -i SD-Vault_1.0.1_amd64.deb
+```
+
+**RPM**
+```sh
+sudo rpm -i SD-Vault-1.0.1-1.x86_64.rpm
+```
 
 ## Build from Source
 
@@ -48,15 +65,15 @@ pnpm tauri build
 
 ## Tech Stack
 
-- [Tauri v2](https://tauri.app) · [React](https://react.dev) · [SQLCipher](https://www.zetetic.net/sqlcipher/)
+[Tauri v2](https://tauri.app) · [React](https://react.dev) · [SQLCipher](https://www.zetetic.net/sqlcipher/) · [Argon2id](https://github.com/P-H-C/phc-winner-argon2) · [BLAKE3](https://github.com/BLAKE3-team/BLAKE3)
 
-## Haftungsausschluss
+## Disclaimer
 
-SD-Vault wird **so wie es ist** bereitgestellt — ohne jegliche ausdrückliche oder stillschweigende Garantie.
+SD-Vault is provided **as-is** without any warranty, express or implied.
 
-Der Entwickler übernimmt **keinerlei Haftung** für Datenverlust, Schäden durch Sicherheitslücken, Abstürze, fehlerhafte Backups oder Folgeschäden jeglicher Art, die durch die Nutzung dieser Software entstehen.
+The developer accepts **no liability** for data loss, security vulnerabilities, crashes, failed backups, or any consequential damages arising from use of this software.
 
-Die Sicherheit des Vaults hängt maßgeblich von der Stärke des Master-Passworts und dem sicheren Aufbewahren des Emergency Kits ab. Der Quellcode ist auf GitHub einsehbar und prüfbar.
+Vault security depends on the strength of your master password and the safe storage of your Emergency Kit. The source code is publicly auditable on GitHub.
 
 ## License
 
