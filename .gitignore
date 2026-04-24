@@ -11,7 +11,3 @@ build/windows/*.exe
 build/windows/sd-vault.exe
 build/windows/icon.ico
 .worktrees/
-.claude/
-CLAUDE.md
-.claudeignore
-docs/superpowers/
