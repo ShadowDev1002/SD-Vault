@@ -97,14 +97,6 @@ function CardIcon() {
         </svg>
     );
 }
-function NoteIcon() {
-    return (
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="2" y="1" width="12" height="14" rx="1.5" />
-            <path d="M5 5h6M5 8h6M5 11h4" strokeLinecap="round" />
-        </svg>
-    );
-}
 function HealthIcon() {
     return (
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">

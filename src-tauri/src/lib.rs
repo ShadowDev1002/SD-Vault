@@ -9,13 +9,17 @@ use dirs::document_dir;
 use rusqlite::Connection;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
+#[cfg(target_os = "android")]
+use std::sync::OnceLock;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use zeroize::Zeroizing;
 
 // Android: Tauri setzt den App-Datenpfad via setup-Hook, da dirs::data_dir() None liefert.
+#[cfg(target_os = "android")]
 static ANDROID_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
+#[cfg(target_os = "android")]
 pub(crate) fn init_android_data_dir(path: PathBuf) {
     let _ = ANDROID_DATA_DIR.set(path);
 }
