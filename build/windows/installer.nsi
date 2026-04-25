@@ -1,12 +1,12 @@
 !define APP_NAME "SD-Vault"
-!define APP_VERSION "1.1.1"
+!define APP_VERSION "1.2.0"
 !define APP_PUBLISHER "ShadowDev"
 !define APP_EXE "sd-vault.exe"
 !define APP_ICON "icon.ico"
 !define INSTALL_DIR "$PROGRAMFILES64\${APP_NAME}"
 
 Name "${APP_NAME} ${APP_VERSION}"
-OutFile "SD-Vault_1.1.1_x64-setup.exe"
+OutFile "SD-Vault_1.2.0_x64-setup.exe"
 InstallDir "${INSTALL_DIR}"
 InstallDirRegKey HKLM "Software\${APP_NAME}" "Install_Dir"
 RequestExecutionLevel admin
