@@ -6,6 +6,8 @@ import type { ViewCategory } from './Sidebar';
 import type { SortOption } from './EntryList';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
+import MobileVaultList from './MobileVaultList';
+import MobileDetailScreen from './MobileDetailScreen';
 import EntryList from './EntryList';
 import EntryDetail from './EntryDetail';
 import QuickSearch from './QuickSearch';
@@ -192,70 +194,50 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
             <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: 'var(--vault-bg)' }}>
                 {updateBanner}
 
-                {/* Mobile top bar */}
-                <div className="flex items-center gap-2 px-4 py-2 shrink-0 border-b" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
-                    {mobilePanel === 'detail' && (
-                        <button
-                            onClick={handleBackToList}
-                            className="flex items-center gap-1 mr-1 py-1 pr-2"
-                            style={{ color: 'var(--accent)' }}
-                        >
-                            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            <span className="text-sm">Zurück</span>
-                        </button>
-                    )}
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="Suchen..."
-                        className="flex-1 px-3 py-2 text-sm rounded-xl border"
-                        style={{ backgroundColor: 'var(--surface-2)', borderColor: 'var(--border)', color: 'var(--text)', outline: 'none' }}
-                    />
-                </div>
-
-                {/* Mobile panels */}
-                <div className="flex-1 min-h-0 overflow-hidden" style={{ paddingBottom: '56px' }}>
-                    {mobilePanel === 'list' && (
-                        activeCategory === 'health' ? (
-                            <HealthDashboard
-                                items={items}
-                                onSelect={id => { setSelectedId(id); setActiveCategory('all'); setMobilePanel('detail'); }}
-                            />
-                        ) : (
-                            <EntryList
-                                items={sorted}
-                                selectedId={selectedId}
-                                onSelect={handleSelectEntry}
-                                onAdd={handleAddEntry}
-                                sort={sort}
-                                onSortChange={handleSortChange}
-                                selectedIds={selectedIds}
-                                onToggleSelect={handleToggleSelect}
-                                onBulkDelete={handleBulkDelete}
-                                onBulkMove={handleBulkMove}
-                            />
-                        )
-                    )}
-                    {mobilePanel === 'detail' && (
-                        <EntryDetail
-                            item={isNew ? null : selectedItem}
-                            onSaved={handleSaved}
-                            onDeleted={handleDeleted}
-                            onCancel={handleBackToList}
-                            isNew={isNew}
-                            newCategory={newCategory}
+                <div className="flex-1 overflow-hidden" style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom))' }}>
+                    {activeCategory === 'health' ? (
+                        <HealthDashboard
+                            items={items}
+                            onSelect={id => { setSelectedId(id); setActiveCategory('all'); setMobilePanel('detail'); }}
+                        />
+                    ) : (
+                        <MobileVaultList
+                            items={sorted}
+                            activeCategory={activeCategory}
+                            activeTag={activeTag}
+                            allTags={allTags}
+                            search={search}
+                            onSearchChange={setSearch}
+                            onCategoryChange={handleCategoryChange}
+                            onTagChange={handleTagChange}
+                            onSelect={handleSelectEntry}
+                            onAdd={cat => {
+                                setActiveCategory(cat);
+                                setSelectedId(null);
+                                setIsNew(true);
+                                setMobilePanel('detail');
+                            }}
+                            onLock={handleLock}
+                            onDeleted={loadItems}
                         />
                     )}
                 </div>
+
+                {mobilePanel === 'detail' && (
+                    <MobileDetailScreen
+                        item={isNew ? null : selectedItem}
+                        isNew={isNew}
+                        newCategory={newCategory}
+                        onSaved={handleSaved}
+                        onDeleted={handleDeleted}
+                        onBack={handleBackToList}
+                    />
+                )}
 
                 <BottomNav
                     activeCategory={activeCategory}
                     onCategoryChange={handleCategoryChange}
                     onSettings={onSettings}
-                    onLock={handleLock}
                     hasUpdate={hasUpdate}
                 />
             </div>

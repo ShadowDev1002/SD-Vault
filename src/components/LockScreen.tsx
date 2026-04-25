@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { VaultMeta } from '../types';
 import logoUrl from '../assets/logo.svg';
+import { useMobile } from '../utils/mobile';
 
 interface Props {
     onUnlocked: (meta: VaultMeta) => void;
@@ -39,6 +40,8 @@ export default function LockScreen({ onUnlocked }: Props) {
     const [lockKey, setLockKey]           = useState('');
     const [lockKeyError, setLockKeyError] = useState('');
     const [lockKeyLoading, setLockKeyLoading] = useState(false);
+
+    const isMobile = useMobile();
 
     async function handleUnlock(e: React.FormEvent) {
         e.preventDefault();
@@ -99,6 +102,113 @@ export default function LockScreen({ onUnlocked }: Props) {
     function goBack() {
         setMode('unlock');
         setSecretKey(''); setNewPw(''); setConfirmPw(''); setResetError('');
+    }
+
+    if (isMobile) {
+        return (
+            <div className="flex flex-col min-h-screen px-4 pt-16 pb-8" style={{ backgroundColor: 'var(--vault-bg)' }}>
+                {/* Lockout banner */}
+                {lockoutSeconds > 0 && (
+                    <div className="fixed top-0 left-0 right-0 py-2 text-center text-sm font-medium text-white z-50"
+                        style={{ backgroundColor: '#ff453a' }}>
+                        Gesperrt — noch {lockoutSeconds}s
+                    </div>
+                )}
+
+                <div className="flex flex-col items-center mb-10">
+                    <img src={logoUrl} alt="SD-Vault" className="w-16 h-16 mb-2" draggable={false} />
+                    <h1 className="text-[22px] font-semibold" style={{ color: 'var(--text)' }}>SD-Vault</h1>
+                </div>
+
+                {mode === 'unlock' && (
+                    <form onSubmit={handleUnlock} className="flex flex-col gap-3 w-full">
+                        <input
+                            type="password"
+                            value={masterPw}
+                            onChange={e => setMasterPw(e.target.value)}
+                            className="sd-input"
+                            style={{ height: 52, borderRadius: 14, fontSize: 15 }}
+                            placeholder="Master-Passwort"
+                            required autoFocus
+                        />
+                        {unlockError && <ErrorBox>{unlockError}</ErrorBox>}
+                        <button
+                            type="submit"
+                            disabled={unlockLoading || lockoutSeconds > 0}
+                            className="sd-btn-primary"
+                            style={{ height: 52, borderRadius: 14, fontSize: 15 }}
+                        >
+                            {unlockLoading ? 'Entsperren…' : lockoutSeconds > 0 ? `Gesperrt (${lockoutSeconds}s)` : 'Entsperren'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setMode('reset')}
+                            className="text-sm py-2"
+                            style={{ color: 'var(--accent)' }}
+                        >
+                            Passwort vergessen?
+                        </button>
+                    </form>
+                )}
+
+                {mode === 'reset' && (
+                    <form onSubmit={handleReset} className="flex flex-col gap-3 w-full">
+                        <div className="px-3 py-2.5 rounded-xl text-xs leading-relaxed"
+                            style={{ background: 'rgba(10,132,255,0.07)', border: '1px solid rgba(10,132,255,0.18)', color: 'rgba(10,132,255,0.9)' }}>
+                            Secret Key aus dem Emergency Kit eingeben.
+                        </div>
+                        <input type="text" value={secretKey} onChange={e => setSecretKey(e.target.value.toUpperCase())}
+                            className="sd-input font-mono text-xs" placeholder="SDVLT-XXXXXXXX-…" required autoFocus />
+                        <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)}
+                            className="sd-input" placeholder="Neues Passwort" required />
+                        <input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)}
+                            className="sd-input" placeholder="Passwort wiederholen" required />
+                        {resetError && <ErrorBox>{resetError}</ErrorBox>}
+                        <button type="submit" disabled={resetLoading} className="sd-btn-primary"
+                            style={{ height: 52, borderRadius: 14 }}>
+                            {resetLoading ? 'Zurücksetzen…' : 'Passwort zurücksetzen'}
+                        </button>
+                        <button type="button" onClick={goBack} className="text-sm py-2" style={{ color: 'var(--text-3)' }}>
+                            ← Zurück
+                        </button>
+                    </form>
+                )}
+
+                {mode === 'hard-locked' && (
+                    <form onSubmit={handleUnlockLock} className="flex flex-col gap-3 w-full">
+                        <div className="px-3 py-2.5 rounded-xl text-xs leading-relaxed"
+                            style={{ background: 'rgba(255,69,58,0.08)', border: '1px solid rgba(255,69,58,0.25)', color: '#ff6b63' }}>
+                            Zu viele Fehlversuche. Gib deinen Secret Key ein.
+                        </div>
+                        <input type="text" value={lockKey} onChange={e => setLockKey(e.target.value.toUpperCase())}
+                            className="sd-input font-mono text-xs" placeholder="SDVLT-XXXXXXXX-…" required autoFocus />
+                        {lockKeyError && <ErrorBox>{lockKeyError}</ErrorBox>}
+                        <button type="submit" disabled={lockKeyLoading} className="sd-btn-primary"
+                            style={{ height: 52, borderRadius: 14 }}>
+                            {lockKeyLoading ? 'Prüfe…' : 'Sperre aufheben'}
+                        </button>
+                    </form>
+                )}
+
+                {mode === 'reset-done' && (
+                    <div className="flex flex-col items-center gap-5 pt-8 text-center">
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                            style={{ background: 'rgba(50,215,75,0.1)', border: '1px solid rgba(50,215,75,0.25)', color: 'var(--success)' }}>
+                            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none">
+                                <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p className="font-semibold" style={{ color: 'var(--text)' }}>Passwort geändert</p>
+                            <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>Melde dich mit dem neuen Passwort an.</p>
+                        </div>
+                        <button onClick={goBack} className="sd-btn-primary w-full" style={{ height: 52, borderRadius: 14 }}>
+                            Zum Login
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
     }
 
     return (
