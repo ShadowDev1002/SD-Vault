@@ -20,6 +20,7 @@ pub struct ItemWithPayload {
     pub id: String,
     pub category: String,
     pub updated_at: i64,
+    pub is_favorite: bool,
     pub payload: ItemPayload,
 }
 
@@ -56,6 +57,11 @@ pub struct ItemPayload {
     #[serde(default)] pub zip: String,
     #[serde(default)] pub country: String,
     #[serde(default)] pub birthday: String,
+
+    // v1.1.0
+    #[serde(default)] pub tags: Vec<String>,
+    #[serde(default)] pub totp_backup_codes: Vec<String>,
+    #[serde(default)] pub card_expiry_reminder: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -157,7 +163,8 @@ fn ensure_schema(conn: &Connection) -> Result<(), String> {
             category        TEXT NOT NULL,
             updated_at      INTEGER NOT NULL,
             sync_hash       TEXT NOT NULL,
-            encrypted_blob  BLOB NOT NULL
+            encrypted_blob  BLOB NOT NULL,
+            is_favorite     INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS attachments (
             id              TEXT PRIMARY KEY,
@@ -166,9 +173,20 @@ fn ensure_schema(conn: &Connection) -> Result<(), String> {
             mime            TEXT NOT NULL DEFAULT '',
             size            INTEGER NOT NULL,
             encrypted_blob  BLOB NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS item_tags (
+            item_id         TEXT NOT NULL,
+            tag             TEXT NOT NULL,
+            PRIMARY KEY (item_id, tag)
         );",
     )
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+
+    // Migrations für bestehende Vaults
+    let _ = conn.execute_batch("ALTER TABLE items ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0;");
+    let _ = conn.execute_batch("CREATE TABLE IF NOT EXISTS item_tags (item_id TEXT NOT NULL, tag TEXT NOT NULL, PRIMARY KEY (item_id, tag));");
+
+    Ok(())
 }
 
 /// Legt einen neuen vault_meta-Eintrag an. Nur einmal beim Vault-Erstellen aufrufen.
@@ -210,6 +228,24 @@ pub fn read_vault_meta(conn: &Connection) -> Result<VaultMeta, String> {
     .map_err(|e| e.to_string())
 }
 
+fn sync_item_metadata(conn: &Connection, id: &str, payload: &ItemPayload) -> Result<(), String> {
+    let is_fav = payload.favorite as i64;
+    conn.execute(
+        "UPDATE items SET is_favorite = ?1 WHERE id = ?2",
+        params![is_fav, id],
+    ).map_err(|e| e.to_string())?;
+
+    conn.execute("DELETE FROM item_tags WHERE item_id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    for tag in &payload.tags {
+        conn.execute(
+            "INSERT OR IGNORE INTO item_tags (item_id, tag) VALUES (?1, ?2)",
+            params![id, tag],
+        ).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Fügt einen verschlüsselten Eintrag ein. Gibt die neue ID zurück.
 pub fn insert_item(
     conn: &Connection,
@@ -222,14 +258,16 @@ pub fn insert_item(
     let json = serde_json::to_vec(payload).map_err(|e| e.to_string())?;
     let blob = crypto::encrypt(entry_key, &json)?;
     let hash = hex::encode(Sha256::digest(&blob));
+    let is_fav = payload.favorite as i64;
 
     conn.execute(
-        "INSERT INTO items (id, category, updated_at, sync_hash, encrypted_blob)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![id, category, now, hash, blob],
+        "INSERT INTO items (id, category, updated_at, sync_hash, encrypted_blob, is_favorite)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![id, category, now, hash, blob, is_fav],
     )
     .map_err(|e| e.to_string())?;
 
+    sync_item_metadata(conn, &id, payload)?;
     Ok(id)
 }
 
@@ -244,18 +282,22 @@ pub fn update_item(
     let json = serde_json::to_vec(payload).map_err(|e| e.to_string())?;
     let blob = crypto::encrypt(entry_key, &json)?;
     let hash = hex::encode(Sha256::digest(&blob));
+    let is_fav = payload.favorite as i64;
 
     conn.execute(
-        "UPDATE items SET updated_at = ?1, sync_hash = ?2, encrypted_blob = ?3 WHERE id = ?4",
-        params![now, hash, blob, id],
+        "UPDATE items SET updated_at = ?1, sync_hash = ?2, encrypted_blob = ?3, is_favorite = ?4 WHERE id = ?5",
+        params![now, hash, blob, is_fav, id],
     )
     .map_err(|e| e.to_string())?;
 
+    sync_item_metadata(conn, id, payload)?;
     Ok(())
 }
 
 /// Löscht einen Eintrag nach ID.
 pub fn delete_item(conn: &Connection, id: &str) -> Result<(), String> {
+    conn.execute("DELETE FROM item_tags WHERE item_id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM items WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -267,8 +309,8 @@ pub fn get_items(
     entry_key: &[u8; 32],
     category: Option<&str>,
 ) -> Result<Vec<ItemWithPayload>, String> {
-    let sql_all = "SELECT id, category, updated_at, encrypted_blob FROM items ORDER BY updated_at DESC";
-    let sql_cat = "SELECT id, category, updated_at, encrypted_blob FROM items WHERE category = ?1 ORDER BY updated_at DESC";
+    let sql_all = "SELECT id, category, updated_at, encrypted_blob, is_favorite FROM items ORDER BY is_favorite DESC, updated_at DESC";
+    let sql_cat = "SELECT id, category, updated_at, encrypted_blob, is_favorite FROM items WHERE category = ?1 ORDER BY is_favorite DESC, updated_at DESC";
 
     let mut stmt = match category {
         Some(_) => conn.prepare(sql_cat),
@@ -288,14 +330,59 @@ pub fn get_items(
         let plaintext = crypto::decrypt(entry_key, &blob)?;
         let payload: ItemPayload =
             serde_json::from_slice(&plaintext).map_err(|e| e.to_string())?;
+        let is_favorite: i64 = row.get(4).unwrap_or(0);
 
         items.push(ItemWithPayload {
             id: row.get(0).map_err(|e| e.to_string())?,
             category: row.get(1).map_err(|e| e.to_string())?,
             updated_at: row.get(2).map_err(|e| e.to_string())?,
+            is_favorite: is_favorite != 0,
             payload,
         });
     }
 
+    Ok(items)
+}
+
+/// Gibt alle vorhandenen Tags zurück.
+pub fn get_all_tags(conn: &Connection) -> Result<Vec<String>, String> {
+    let mut stmt = conn.prepare("SELECT DISTINCT tag FROM item_tags ORDER BY tag")
+        .map_err(|e| e.to_string())?;
+    let tags: Vec<String> = stmt.query_map([], |row| row.get(0))
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(tags)
+}
+
+/// Gibt alle Einträge mit einem bestimmten Tag zurück.
+pub fn get_items_by_tag(
+    conn: &Connection,
+    entry_key: &[u8; 32],
+    tag: &str,
+) -> Result<Vec<ItemWithPayload>, String> {
+    let mut stmt = conn.prepare(
+        "SELECT i.id, i.category, i.updated_at, i.encrypted_blob, i.is_favorite
+         FROM items i
+         JOIN item_tags t ON t.item_id = i.id
+         WHERE t.tag = ?1
+         ORDER BY i.is_favorite DESC, i.updated_at DESC",
+    ).map_err(|e| e.to_string())?;
+
+    let mut rows = stmt.query(rusqlite::params![tag]).map_err(|e| e.to_string())?;
+    let mut items = Vec::new();
+    while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        let blob: Vec<u8> = row.get(3).map_err(|e| e.to_string())?;
+        let plaintext = crypto::decrypt(entry_key, &blob)?;
+        let payload: ItemPayload = serde_json::from_slice(&plaintext).map_err(|e| e.to_string())?;
+        let is_favorite: i64 = row.get(4).unwrap_or(0);
+        items.push(ItemWithPayload {
+            id: row.get(0).map_err(|e| e.to_string())?,
+            category: row.get(1).map_err(|e| e.to_string())?,
+            updated_at: row.get(2).map_err(|e| e.to_string())?,
+            is_favorite: is_favorite != 0,
+            payload,
+        });
+    }
     Ok(items)
 }

@@ -53,18 +53,18 @@ pub fn derive_master_key(
 
 /// Leitet den SQLCipher-Key via HKDF-SHA256 ab (SQLCipher nutzt intern AES-256-CBC).
 pub fn derive_sqlcipher_key(master_key: &[u8; KEY_LEN]) -> Zeroizing<[u8; KEY_LEN]> {
-    let hk = Hkdf::<Sha256>::new(None, master_key);
+    let hk = Hkdf::<Sha256>::new(Some(b"sd-vault:sqlcipher:salt:v2"), master_key);
     let mut okm = Zeroizing::new([0u8; KEY_LEN]);
-    hk.expand(b"sd-vault:sqlcipher:v1", okm.as_mut())
+    hk.expand(b"sd-vault:sqlcipher:v2", okm.as_mut())
         .expect("HKDF expand: output length 32 always valid");
     okm
 }
 
 /// Leitet den Entry-Encryption-Key via HKDF-SHA256 ab.
 pub fn derive_entry_key(master_key: &[u8; KEY_LEN]) -> Zeroizing<[u8; KEY_LEN]> {
-    let hk = Hkdf::<Sha256>::new(None, master_key);
+    let hk = Hkdf::<Sha256>::new(Some(b"sd-vault:entries:salt:v2"), master_key);
     let mut okm = Zeroizing::new([0u8; KEY_LEN]);
-    hk.expand(b"sd-vault:entries:v1", okm.as_mut())
+    hk.expand(b"sd-vault:entries:v2", okm.as_mut())
         .expect("HKDF expand: output length 32 always valid");
     okm
 }
@@ -96,21 +96,21 @@ pub fn decrypt(key: &[u8; KEY_LEN], data: &[u8]) -> Result<Vec<u8>, String> {
         .map_err(|_| "Entschlüsselung fehlgeschlagen — falscher Key oder korrupte Daten".into())
 }
 
-/// Generiert einen 20-Byte Secret Key.
-/// Format: "SDVLT-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
-pub fn generate_secret_key() -> ([u8; 20], String) {
-    let mut bytes = [0u8; 20];
+/// Generiert einen 32-Byte (256-bit) Secret Key.
+/// Format: "SDVLT-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
+pub fn generate_secret_key() -> ([u8; 32], String) {
+    let mut bytes = [0u8; 32];
     OsRng.fill_bytes(&mut bytes);
     let encoded = base32::encode(base32::Alphabet::RFC4648 { padding: false }, &bytes);
     let formatted = format!(
-        "SDVLT-{}-{}-{}-{}",
-        &encoded[0..8], &encoded[8..16], &encoded[16..24], &encoded[24..32]
+        "SDVLT-{}-{}-{}-{}-{}",
+        &encoded[0..8], &encoded[8..16], &encoded[16..24], &encoded[24..32], &encoded[32..40]
     );
     (bytes, formatted)
 }
 
-/// Parst einen formatierten Secret Key zurück zu raw bytes.
-pub fn parse_secret_key(formatted: &str) -> Result<[u8; 20], String> {
+/// Parst einen formatierten Secret Key (32-Byte) zurück zu raw bytes.
+pub fn parse_secret_key(formatted: &str) -> Result<[u8; 32], String> {
     let stripped = formatted
         .strip_prefix("SDVLT-")
         .ok_or("Ungültiges Format: fehlendes 'SDVLT-' Präfix")?
@@ -119,20 +119,20 @@ pub fn parse_secret_key(formatted: &str) -> Result<[u8; 20], String> {
     let bytes = base32::decode(base32::Alphabet::RFC4648 { padding: false }, &stripped)
         .ok_or("Ungültiger Secret Key: kein gültiges Base32")?;
 
-    if bytes.len() != 20 {
-        return Err(format!("Ungültige Secret Key Länge: erwartet 20, erhalten {}", bytes.len()));
+    if bytes.len() != 32 {
+        return Err(format!("Ungültige Secret Key Länge: erwartet 32, erhalten {}", bytes.len()));
     }
 
-    let mut arr = [0u8; 20];
+    let mut arr = [0u8; 32];
     arr.copy_from_slice(&bytes);
     Ok(arr)
 }
 
-/// Leitet einen Recovery-Key aus dem Secret Key ab (HKDF, 160-Bit Entropie → kein Argon2 nötig).
-pub fn derive_recovery_key(secret_key: &[u8; 20]) -> Zeroizing<[u8; KEY_LEN]> {
-    let hk = Hkdf::<Sha256>::new(None, secret_key);
+/// Leitet einen Recovery-Key aus dem Secret Key ab (HKDF mit Salt, 256-Bit Entropie).
+pub fn derive_recovery_key(secret_key: &[u8; 32]) -> Zeroizing<[u8; KEY_LEN]> {
+    let hk = Hkdf::<Sha256>::new(Some(b"sd-vault:recovery:salt:v2"), secret_key);
     let mut okm = Zeroizing::new([0u8; KEY_LEN]);
-    hk.expand(b"sd-vault:recovery:v1", okm.as_mut())
+    hk.expand(b"sd-vault:recovery:v2", okm.as_mut())
         .expect("HKDF expand: output length 32 always valid");
     okm
 }
@@ -162,9 +162,9 @@ pub fn generate_salt() -> [u8; 32] {
 
 /// Leitet einen Konfigurations-Verschlüsselungs-Key via HKDF-SHA256 ab.
 pub fn derive_config_key(master_key: &[u8; KEY_LEN]) -> Zeroizing<[u8; KEY_LEN]> {
-    let hk = Hkdf::<Sha256>::new(None, master_key);
+    let hk = Hkdf::<Sha256>::new(Some(b"sd-vault:config:salt:v2"), master_key);
     let mut okm = Zeroizing::new([0u8; KEY_LEN]);
-    hk.expand(b"sd-vault:config:v1", okm.as_mut())
+    hk.expand(b"sd-vault:config:v2", okm.as_mut())
         .expect("HKDF expand: output length 32 always valid");
     okm
 }

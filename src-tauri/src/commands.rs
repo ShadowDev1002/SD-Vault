@@ -338,6 +338,62 @@ pub fn move_item_category(
 }
 
 #[tauri::command]
+pub fn toggle_favorite(state: State<'_, AppState>, id: String) -> Result<bool, String> {
+    let key_guard = state.master_key.lock().unwrap();
+    let master_key = key_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    let entry_key = crate::crypto::derive_entry_key(master_key);
+
+    let conn_guard = state.db_conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+
+    // Payload lesen, favorite togglen, neu verschlüsseln
+    let (blob, current_fav): (Vec<u8>, i64) = conn.query_row(
+        "SELECT encrypted_blob, is_favorite FROM items WHERE id = ?1",
+        rusqlite::params![id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ).map_err(|e| e.to_string())?;
+
+    let plaintext = crate::crypto::decrypt(&entry_key, &blob)?;
+    let mut payload: crate::db::ItemPayload =
+        serde_json::from_slice(&plaintext).map_err(|e| e.to_string())?;
+
+    payload.favorite = current_fav == 0;
+    let new_fav = payload.favorite as i64;
+
+    let json = serde_json::to_vec(&payload).map_err(|e| e.to_string())?;
+    let new_blob = crate::crypto::encrypt(&entry_key, &json)?;
+    let hash = hex::encode(<sha2::Sha256 as sha2::Digest>::digest(&new_blob));
+    let now = chrono::Utc::now().timestamp();
+
+    conn.execute(
+        "UPDATE items SET encrypted_blob = ?1, sync_hash = ?2, updated_at = ?3, is_favorite = ?4 WHERE id = ?5",
+        rusqlite::params![new_blob, hash, now, new_fav, id],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(payload.favorite)
+}
+
+#[tauri::command]
+pub fn get_all_tags(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let conn_guard = state.db_conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    crate::db::get_all_tags(conn)
+}
+
+#[tauri::command]
+pub fn get_items_by_tag(
+    state: State<'_, AppState>,
+    tag: String,
+) -> Result<Vec<ItemWithPayload>, String> {
+    let key_guard = state.master_key.lock().unwrap();
+    let master_key = key_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    let entry_key = crate::crypto::derive_entry_key(master_key);
+    let conn_guard = state.db_conn.lock().unwrap();
+    let conn = conn_guard.as_ref().ok_or("Vault ist gesperrt")?;
+    crate::db::get_items_by_tag(conn, &entry_key, &tag)
+}
+
+#[tauri::command]
 pub async fn sync_local(state: State<'_, AppState>) -> Result<(), String> {
     let vault_dir = state.vault_dir.lock().unwrap().clone().ok_or("Vault ist gesperrt")?;
     let data = fs::read(vault_dir.join("vault.db")).map_err(|e| e.to_string())?;

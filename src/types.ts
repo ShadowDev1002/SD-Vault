@@ -40,12 +40,18 @@ export interface ItemPayload {
     zip: string;
     country: string;
     birthday: string;
+
+    // v1.1.0
+    tags: string[];
+    totp_backup_codes: string[];
+    card_expiry_reminder: boolean;
 }
 
 export interface Item {
     id: string;
     category: Category;
     updated_at: number;
+    is_favorite: boolean;
     payload: ItemPayload;
 }
 

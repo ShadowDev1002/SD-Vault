@@ -168,7 +168,7 @@ pub(crate) fn read_recovery_wrap() -> Result<Vec<u8>, String> {
 }
 
 /// Speichert den Secret Key gerätebunden (chmod 600). Wird nie synchronisiert.
-pub(crate) fn write_secret_key(key_bytes: &[u8; 20]) -> Result<(), String> {
+pub(crate) fn write_secret_key(key_bytes: &[u8; 32]) -> Result<(), String> {
     let path = secret_key_path()?;
     fs::write(&path, key_bytes.as_ref()).map_err(|e| e.to_string())?;
     #[cfg(unix)]
@@ -180,13 +180,13 @@ pub(crate) fn write_secret_key(key_bytes: &[u8; 20]) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn read_secret_key() -> Result<[u8; 20], String> {
+pub(crate) fn read_secret_key() -> Result<[u8; 32], String> {
     let bytes = fs::read(secret_key_path()?)
         .map_err(|e| format!("vault.secret nicht gefunden: {}", e))?;
-    if bytes.len() != 20 {
-        return Err("Korrupte vault.secret Datei".into());
+    if bytes.len() != 32 {
+        return Err("Korrupte vault.secret Datei (v1.1.0: 32 Byte erwartet)".into());
     }
-    let mut key = [0u8; 20];
+    let mut key = [0u8; 32];
     key.copy_from_slice(&bytes);
     Ok(key)
 }
@@ -222,6 +222,9 @@ pub fn run() {
             commands::import_vault,
             commands::reset_lockout_with_key,
             commands::move_item_category,
+            commands::toggle_favorite,
+            commands::get_all_tags,
+            commands::get_items_by_tag,
         ])
         .run(tauri::generate_context!())
         .expect("SD-Vault konnte nicht gestartet werden");

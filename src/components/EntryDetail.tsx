@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { QRCodeSVG } from 'qrcode.react';
 import type { Item, ItemPayload, Category, CustomField, FieldType, AttachmentMeta } from '../types';
 import { copyToClipboard } from '../utils/clipboard';
 import { measureStrength } from '../utils/strength';
@@ -21,6 +22,7 @@ const EMPTY_PAYLOAD: ItemPayload = {
     cardholder: '', card_number: '', expiry: '', cvv: '', pin: '',
     first_name: '', last_name: '', email: '', phone: '',
     company: '', job_title: '', address: '', city: '', zip: '', country: '', birthday: '',
+    tags: [], totp_backup_codes: [], card_expiry_reminder: false,
 };
 
 const CATEGORY_META: Record<Category, { label: string; color: string }> = {
@@ -180,6 +182,8 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
     const [hibpChecking, setHibpChecking] = useState(false);
     const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
     const [dragOver, setDragOver] = useState(false);
+    const [showQr, setShowQr] = useState(false);
+    const [tagInput, setTagInput] = useState('');
 
     useEffect(() => {
         setP(item?.payload ?? { ...EMPTY_PAYLOAD });
@@ -282,6 +286,17 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
         const a = document.createElement('a');
         a.href = url; a.download = att.name; a.click();
         URL.revokeObjectURL(url);
+    }
+
+    async function handleToggleFavorite() {
+        if (!item) return;
+        try {
+            const newFav: boolean = await invoke('toggle_favorite', { id: item.id });
+            setP(prev => ({ ...prev, favorite: newFav }));
+            onSaved();
+        } catch (err) {
+            setError(String(err));
+        }
     }
 
     async function handleExportPdf() {
@@ -400,6 +415,32 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                                 </div>
                                 <EField label="Website" value={p.url} onChange={v => set('url', v)} placeholder="https://example.com" />
                                 <EField label="2FA / TOTP-Schlüssel" value={p.totp} onChange={v => set('totp', v)} placeholder="otpauth:// oder Secret Key" mono />
+                                <div>
+                                    <label className="block text-xs uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-3)' }}>TOTP Backup-Codes</label>
+                                    {p.totp_backup_codes.map((code, i) => (
+                                        <div key={i} className="flex gap-2 mb-1.5">
+                                            <input
+                                                value={code}
+                                                onChange={e => {
+                                                    const updated = [...p.totp_backup_codes];
+                                                    updated[i] = e.target.value;
+                                                    setP(prev => ({ ...prev, totp_backup_codes: updated }));
+                                                }}
+                                                className="sd-input font-mono flex-1 text-sm"
+                                                placeholder="Backup-Code"
+                                            />
+                                            <SmBtn onClick={() => setP(prev => ({ ...prev, totp_backup_codes: prev.totp_backup_codes.filter((_, j) => j !== i) }))} title="Entfernen" danger>
+                                                <TrashSvg />
+                                            </SmBtn>
+                                        </div>
+                                    ))}
+                                    <button
+                                        onClick={() => setP(prev => ({ ...prev, totp_backup_codes: [...prev.totp_backup_codes, ''] }))}
+                                        className="text-xs px-3 py-1.5 rounded-lg border border-dashed transition-colors"
+                                        style={{ borderColor: 'var(--border)', color: 'var(--text-3)' }}>
+                                        + Code hinzufügen
+                                    </button>
+                                </div>
                             </div>
                         </Section>
                     </>}
@@ -414,6 +455,16 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                                     <EField label="CVV" value={p.cvv} onChange={v => set('cvv', v)} placeholder="•••" />
                                 </div>
                                 <EField label="PIN" value={p.pin} onChange={v => set('pin', v)} placeholder="••••" type="password" />
+                                <label className="flex items-center gap-3 cursor-pointer select-none">
+                                    <div
+                                        onClick={() => setP(prev => ({ ...prev, card_expiry_reminder: !prev.card_expiry_reminder }))}
+                                        className="w-10 h-6 rounded-full transition-all relative flex-shrink-0"
+                                        style={{ background: p.card_expiry_reminder ? 'var(--accent)' : 'var(--surface-3)' }}>
+                                        <div className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all"
+                                            style={{ left: p.card_expiry_reminder ? '22px' : '4px' }} />
+                                    </div>
+                                    <span className="text-sm" style={{ color: 'var(--text-2)' }}>Ablauf-Erinnerung aktivieren</span>
+                                </label>
                             </div>
                         </Section>
                     </>}
@@ -462,6 +513,48 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                                 rows={4}
                                 placeholder="Optionale Notizen…"
                             />
+                        </div>
+                    </Section>
+
+                    {/* Tags */}
+                    <Section title="Tags">
+                        <div className="p-4 space-y-2">
+                            <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+                                {p.tags.map(tag => (
+                                    <span key={tag} className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                        style={{ background: 'var(--accent)22', color: 'var(--accent)', border: '1px solid var(--accent)44' }}>
+                                        {tag}
+                                        <button onClick={() => setP(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }))}
+                                            className="ml-0.5 leading-none opacity-60 hover:opacity-100">×</button>
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <input
+                                    value={tagInput}
+                                    onChange={e => setTagInput(e.target.value)}
+                                    onKeyDown={e => {
+                                        if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+                                            e.preventDefault();
+                                            const t = tagInput.trim().toLowerCase();
+                                            if (!p.tags.includes(t)) setP(prev => ({ ...prev, tags: [...prev.tags, t] }));
+                                            setTagInput('');
+                                        }
+                                    }}
+                                    className="sd-input flex-1 text-sm"
+                                    placeholder="Tag eingeben + Enter"
+                                />
+                                <button
+                                    onClick={() => {
+                                        const t = tagInput.trim().toLowerCase();
+                                        if (t && !p.tags.includes(t)) setP(prev => ({ ...prev, tags: [...prev.tags, t] }));
+                                        setTagInput('');
+                                    }}
+                                    className="text-xs px-3 py-1.5 rounded-lg border transition-colors"
+                                    style={{ borderColor: 'var(--border)', color: 'var(--text-2)' }}>
+                                    +
+                                </button>
+                            </div>
                         </div>
                     </Section>
 
@@ -544,7 +637,7 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                         </span>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                        <SmBtn onClick={() => set('favorite', !p.favorite)} title="Favorit">
+                        <SmBtn onClick={handleToggleFavorite} title="Favorit">
                             <svg className="w-4 h-4" viewBox="0 0 20 20" fill={p.favorite ? '#ffd60a' : 'none'} stroke={p.favorite ? '#ffd60a' : 'currentColor'} strokeWidth="1.5">
                                 <path d="M10 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L10 14.3l-4.8 2.6.9-5.4L2.2 7.7l5.4-.8L10 2z" strokeLinejoin="round" />
                             </svg>
@@ -596,6 +689,41 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                                 try { const { code } = await generateTotp(p.totp); copyToClipboard(code); } catch {}
                             }} />
                         )}
+                        {p.totp && (
+                            <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--border-2)' }}>
+                                <button
+                                    onClick={() => setShowQr(q => !q)}
+                                    className="text-xs flex items-center gap-1.5 transition-colors"
+                                    style={{ color: 'var(--text-3)' }}>
+                                    <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                        <rect x="2" y="2" width="7" height="7" rx="1" /><rect x="11" y="2" width="7" height="7" rx="1" />
+                                        <rect x="2" y="11" width="7" height="7" rx="1" /><path d="M11 14h3v3M14 11h3v3" strokeLinecap="round" />
+                                    </svg>
+                                    {showQr ? 'QR-Code ausblenden' : 'QR-Code anzeigen'}
+                                </button>
+                                {showQr && (
+                                    <div className="mt-3 flex justify-center p-3 rounded-xl" style={{ background: 'white' }}>
+                                        <QRCodeSVG
+                                            value={p.totp.startsWith('otpauth://') ? p.totp : `otpauth://totp/${encodeURIComponent(p.title)}?secret=${p.totp}&issuer=SD-Vault`}
+                                            size={160}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {p.totp_backup_codes.length > 0 && (
+                            <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--border-2)' }}>
+                                <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--text-3)' }}>Backup-Codes</p>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    {p.totp_backup_codes.map((code, i) => (
+                                        <div key={i} className="group flex items-center justify-between gap-2 px-2 py-1 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+                                            <span className="font-mono text-sm" style={{ color: 'var(--text)' }}>{code}</span>
+                                            <SmBtn onClick={() => cp(code, `bc-${i}`)} title="Kopieren"><CopySvg /></SmBtn>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </Section>
                 )}
 
@@ -606,6 +734,22 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                         <VField label="Ablaufdatum" value={p.expiry} onCopy={() => cp(p.expiry, 'expiry')} />
                         <VField label="CVV" value={p.cvv} secret mono onCopy={() => cp(p.cvv, 'cvv')} />
                         {p.pin && <VField label="PIN" value={p.pin} secret mono onCopy={() => cp(p.pin, 'pin')} />}
+                        {p.card_expiry_reminder && p.expiry && (() => {
+                            const [m, y] = p.expiry.split('/');
+                            const exp = new Date(2000 + parseInt(y || '0'), parseInt(m || '1') - 1, 1);
+                            const now = new Date();
+                            const diffDays = Math.round((exp.getTime() - now.getTime()) / 86400000);
+                            const color = diffDays < 0 ? '#ff453a' : diffDays < 30 ? '#ff9f0a' : '#32d74b';
+                            const label = diffDays < 0 ? 'Abgelaufen' : diffDays < 30 ? `Läuft in ${diffDays} Tagen ab` : `Gültig noch ${diffDays} Tage`;
+                            return (
+                                <div className="px-4 py-2.5 border-t flex items-center gap-2" style={{ borderColor: 'var(--border-2)' }}>
+                                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="none" stroke={color} strokeWidth="1.5">
+                                        <circle cx="10" cy="10" r="8" /><path d="M10 6v4l3 3" strokeLinecap="round" />
+                                    </svg>
+                                    <span className="text-xs font-medium" style={{ color }}>{label}</span>
+                                </div>
+                            );
+                        })()}
                     </Section>
                 )}
 
@@ -643,6 +787,18 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                             <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text)' }}>{p.notes}</p>
                         </div>
                     </Section>
+                )}
+
+                {/* Tags */}
+                {p.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 px-1">
+                        {p.tags.map(tag => (
+                            <span key={tag} className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                style={{ background: 'var(--accent)22', color: 'var(--accent)', border: '1px solid var(--accent)44' }}>
+                                {tag}
+                            </span>
+                        ))}
+                    </div>
                 )}
 
                 {/* Custom fields */}

@@ -1,12 +1,15 @@
 import logoUrl from '../assets/logo.svg';
 import type { Category } from '../types';
 
-export const APP_VERSION = '1.0.1';
-export type ViewCategory = Category | 'all' | 'health';
+export const APP_VERSION = '1.1.0';
+export type ViewCategory = Category | 'all' | 'health' | 'favorites';
 
 interface Props {
     activeCategory: ViewCategory;
     onCategoryChange: (cat: ViewCategory) => void;
+    activeTag: string | null;
+    onTagChange: (tag: string | null) => void;
+    tags: string[];
     search: string;
     onSearchChange: (s: string) => void;
     onLock: () => void;
@@ -15,15 +18,16 @@ interface Props {
 }
 
 const CATEGORIES: { key: ViewCategory; label: string; icon: JSX.Element }[] = [
-    { key: 'all',      label: 'Alle Einträge', icon: <AllIcon /> },
-    { key: 'login',    label: 'Logins',        icon: <KeyIcon /> },
-    { key: 'card',     label: 'Karten',        icon: <CardIcon /> },
-    { key: 'note',     label: 'Notizen',       icon: <NoteIcon /> },
-    { key: 'identity', label: 'Identitäten',   icon: <UserIcon /> },
-    { key: 'health',   label: 'Passwort-Check', icon: <HealthIcon /> },
+    { key: 'all',       label: 'Alle Einträge',  icon: <AllIcon /> },
+    { key: 'favorites', label: 'Favoriten',       icon: <StarIcon /> },
+    { key: 'login',     label: 'Logins',          icon: <KeyIcon /> },
+    { key: 'card',      label: 'Karten',          icon: <CardIcon /> },
+    { key: 'note',      label: 'Notizen',         icon: <NoteIcon /> },
+    { key: 'identity',  label: 'Identitäten',     icon: <UserIcon /> },
+    { key: 'health',    label: 'Passwort-Check',  icon: <HealthIcon /> },
 ];
 
-export default function Sidebar({ activeCategory, onCategoryChange, search, onSearchChange, onLock, onSettings, hasUpdate }: Props) {
+export default function Sidebar({ activeCategory, onCategoryChange, activeTag, onTagChange, tags, search, onSearchChange, onLock, onSettings, hasUpdate }: Props) {
     return (
         <aside className="flex flex-col h-full w-56 border-r shrink-0" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
             {/* Logo + version */}
@@ -57,23 +61,46 @@ export default function Sidebar({ activeCategory, onCategoryChange, search, onSe
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 px-2 space-y-0.5">
+            <nav className="flex-1 px-2 overflow-y-auto space-y-0.5">
                 {CATEGORIES.map(({ key, label, icon }) => (
                     <button
                         key={key}
-                        onClick={() => onCategoryChange(key)}
+                        onClick={() => { onCategoryChange(key); onTagChange(null); }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-colors"
                         style={{
-                            backgroundColor: activeCategory === key ? 'rgba(10,132,255,0.15)' : 'transparent',
-                            color: activeCategory === key ? 'white' : 'var(--text-2)',
+                            backgroundColor: activeCategory === key && !activeTag ? 'rgba(10,132,255,0.15)' : 'transparent',
+                            color: activeCategory === key && !activeTag ? 'white' : 'var(--text-2)',
                         }}
                     >
-                        <span className="w-4 h-4 shrink-0" style={{ color: activeCategory === key ? 'var(--accent)' : undefined }}>
+                        <span className="w-4 h-4 shrink-0" style={{ color: activeCategory === key && !activeTag ? 'var(--accent)' : undefined }}>
                             {icon}
                         </span>
                         <span>{label}</span>
                     </button>
                 ))}
+
+                {tags.length > 0 && (
+                    <div className="pt-2">
+                        <p className="px-3 pb-1 text-xs uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>Tags</p>
+                        {tags.map(tag => (
+                            <button
+                                key={tag}
+                                onClick={() => { onTagChange(tag === activeTag ? null : tag); }}
+                                className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm text-left transition-colors"
+                                style={{
+                                    backgroundColor: activeTag === tag ? 'rgba(10,132,255,0.15)' : 'transparent',
+                                    color: activeTag === tag ? 'white' : 'var(--text-2)',
+                                }}
+                            >
+                                <span className="w-4 h-4 shrink-0 flex items-center justify-center text-xs"
+                                    style={{ color: activeTag === tag ? 'var(--accent)' : 'var(--text-3)' }}>
+                                    #
+                                </span>
+                                <span className="truncate">{tag}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </nav>
 
             {/* Bottom actions */}
@@ -104,6 +131,13 @@ export default function Sidebar({ activeCategory, onCategoryChange, search, onSe
     );
 }
 
+function StarIcon() {
+    return (
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M8 1.5l1.8 3.7 4.1.6-3 2.9.7 4.1L8 10.9l-3.6 1.9.7-4.1-3-2.9 4.1-.6L8 1.5z" strokeLinejoin="round" />
+        </svg>
+    );
+}
 function AllIcon() {
     return (
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">

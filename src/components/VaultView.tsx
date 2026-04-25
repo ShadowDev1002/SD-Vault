@@ -35,6 +35,7 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
         (localStorage.getItem('sd-sort') as SortOption) ?? 'alpha-asc'
     );
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [activeTag, setActiveTag] = useState<string | null>(null);
 
     const loadItems = useCallback(async () => {
         try {
@@ -93,8 +94,16 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
         loadItems();
     }
 
+    const allTags = useMemo(() => {
+        const tagSet = new Set<string>();
+        items.forEach(item => item.payload.tags?.forEach(t => tagSet.add(t)));
+        return Array.from(tagSet).sort();
+    }, [items]);
+
     const filtered = useMemo(() => items.filter(item => {
-        if (activeCategory !== 'all' && activeCategory !== 'health' && item.category !== activeCategory) return false;
+        if (activeCategory === 'favorites' && !item.is_favorite) return false;
+        if (activeCategory !== 'all' && activeCategory !== 'health' && activeCategory !== 'favorites' && item.category !== activeCategory) return false;
+        if (activeTag && !item.payload.tags?.includes(activeTag)) return false;
         if (!search) return true;
         const q = search.toLowerCase();
         return (
@@ -102,7 +111,7 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
             item.payload.username.toLowerCase().includes(q) ||
             item.payload.url.toLowerCase().includes(q)
         );
-    }), [items, activeCategory, search]);
+    }), [items, activeCategory, activeTag, search]);
 
     const sorted = useMemo(() => [...filtered].sort((a, b) => {
         switch (sort) {
@@ -139,13 +148,22 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
 
     function handleCategoryChange(cat: ViewCategory) {
         setActiveCategory(cat);
+        setActiveTag(null);
         setSelectedId(null);
         setIsNew(false);
         setSelectedIds(new Set());
         if (isMobile) setMobilePanel('list');
     }
 
-    const newCategory: Category = (activeCategory === 'all' || activeCategory === 'health')
+    function handleTagChange(tag: string | null) {
+        setActiveTag(tag);
+        setSelectedId(null);
+        setIsNew(false);
+        setSelectedIds(new Set());
+        if (isMobile) setMobilePanel('list');
+    }
+
+    const newCategory: Category = (activeCategory === 'all' || activeCategory === 'health' || activeCategory === 'favorites')
         ? 'login'
         : activeCategory;
 
@@ -251,6 +269,9 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
                 <Sidebar
                     activeCategory={activeCategory}
                     onCategoryChange={handleCategoryChange}
+                    activeTag={activeTag}
+                    onTagChange={handleTagChange}
+                    tags={allTags}
                     search={search}
                     onSearchChange={setSearch}
                     onLock={handleLock}

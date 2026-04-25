@@ -1,12 +1,12 @@
 !define APP_NAME "SD-Vault"
-!define APP_VERSION "1.0.0"
+!define APP_VERSION "1.1.0"
 !define APP_PUBLISHER "ShadowDev"
 !define APP_EXE "sd-vault.exe"
 !define APP_ICON "icon.ico"
 !define INSTALL_DIR "$PROGRAMFILES64\${APP_NAME}"
 
 Name "${APP_NAME} ${APP_VERSION}"
-OutFile "SD-Vault_1.0.0_x64-setup.exe"
+OutFile "SD-Vault_1.1.0_x64-setup.exe"
 InstallDir "${INSTALL_DIR}"
 InstallDirRegKey HKLM "Software\${APP_NAME}" "Install_Dir"
 RequestExecutionLevel admin
@@ -16,7 +16,7 @@ SetCompressor /SOLID lzma
 
 !define MUI_ICON "${APP_ICON}"
 !define MUI_UNICON "${APP_ICON}"
-!define MUI_WELCOMEPAGE_TITLE "SD-Vault ${APP_VERSION} installieren"
+!define MUI_WELCOMEPAGE_TITLE "SD-Vault ${APP_VERSION} Setup"
 !define MUI_WELCOMEPAGE_TEXT "Dieser Assistent führt Sie durch die Installation von SD-Vault – Ihrem sicheren Passwort-Manager.$\r$\n$\r$\nKlicken Sie auf Weiter, um fortzufahren."
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
 !define MUI_FINISHPAGE_RUN_TEXT "SD-Vault jetzt starten"
