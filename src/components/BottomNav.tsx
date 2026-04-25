@@ -9,11 +9,11 @@ interface Props {
 }
 
 const NAV_ITEMS: { key: ViewCategory; label: string; icon: JSX.Element }[] = [
-    { key: 'all',      label: 'Alle',     icon: <AllIcon /> },
-    { key: 'login',    label: 'Logins',   icon: <KeyIcon /> },
-    { key: 'card',     label: 'Karten',   icon: <CardIcon /> },
-    { key: 'note',     label: 'Notizen',  icon: <NoteIcon /> },
-    { key: 'health',   label: 'Check',    icon: <HealthIcon /> },
+    { key: 'all',       label: 'Alle',      icon: <AllIcon /> },
+    { key: 'favorites', label: 'Favoriten', icon: <StarIcon /> },
+    { key: 'login',     label: 'Logins',    icon: <KeyIcon /> },
+    { key: 'card',      label: 'Karten',    icon: <CardIcon /> },
+    { key: 'health',    label: 'Check',     icon: <HealthIcon /> },
 ];
 
 export default function BottomNav({ activeCategory, onCategoryChange, onSettings, onLock, hasUpdate }: Props) {
@@ -66,6 +66,13 @@ export default function BottomNav({ activeCategory, onCategoryChange, onSettings
     );
 }
 
+function StarIcon() {
+    return (
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M8 1.5l1.8 3.7 4.1.6-3 2.9.7 4.1L8 10.9l-3.6 1.9.7-4.1-3-2.9 4.1-.6L8 1.5z" strokeLinejoin="round" />
+        </svg>
+    );
+}
 function AllIcon() {
     return (
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">

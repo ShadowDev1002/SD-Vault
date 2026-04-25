@@ -363,11 +363,10 @@ pub fn toggle_favorite(state: State<'_, AppState>, id: String) -> Result<bool, S
     let json = serde_json::to_vec(&payload).map_err(|e| e.to_string())?;
     let new_blob = crate::crypto::encrypt(&entry_key, &json)?;
     let hash = hex::encode(<sha2::Sha256 as sha2::Digest>::digest(&new_blob));
-    let now = chrono::Utc::now().timestamp();
 
     conn.execute(
-        "UPDATE items SET encrypted_blob = ?1, sync_hash = ?2, updated_at = ?3, is_favorite = ?4 WHERE id = ?5",
-        rusqlite::params![new_blob, hash, now, new_fav, id],
+        "UPDATE items SET encrypted_blob = ?1, sync_hash = ?2, is_favorite = ?3 WHERE id = ?4",
+        rusqlite::params![new_blob, hash, new_fav, id],
     ).map_err(|e| e.to_string())?;
 
     Ok(payload.favorite)

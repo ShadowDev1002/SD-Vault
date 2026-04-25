@@ -190,6 +190,8 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
         setCat(item?.category ?? newCategory ?? 'login');
         setEditing(isNew ?? false);
         setShowPw(false);
+        setShowQr(false);
+        setTagInput('');
         setError('');
         setHibpCount(null);
         if (item && !isNew) {
@@ -734,22 +736,7 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                         <VField label="Ablaufdatum" value={p.expiry} onCopy={() => cp(p.expiry, 'expiry')} />
                         <VField label="CVV" value={p.cvv} secret mono onCopy={() => cp(p.cvv, 'cvv')} />
                         {p.pin && <VField label="PIN" value={p.pin} secret mono onCopy={() => cp(p.pin, 'pin')} />}
-                        {p.card_expiry_reminder && p.expiry && (() => {
-                            const [m, y] = p.expiry.split('/');
-                            const exp = new Date(2000 + parseInt(y || '0'), parseInt(m || '1') - 1, 1);
-                            const now = new Date();
-                            const diffDays = Math.round((exp.getTime() - now.getTime()) / 86400000);
-                            const color = diffDays < 0 ? '#ff453a' : diffDays < 30 ? '#ff9f0a' : '#32d74b';
-                            const label = diffDays < 0 ? 'Abgelaufen' : diffDays < 30 ? `Läuft in ${diffDays} Tagen ab` : `Gültig noch ${diffDays} Tage`;
-                            return (
-                                <div className="px-4 py-2.5 border-t flex items-center gap-2" style={{ borderColor: 'var(--border-2)' }}>
-                                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="none" stroke={color} strokeWidth="1.5">
-                                        <circle cx="10" cy="10" r="8" /><path d="M10 6v4l3 3" strokeLinecap="round" />
-                                    </svg>
-                                    <span className="text-xs font-medium" style={{ color }}>{label}</span>
-                                </div>
-                            );
-                        })()}
+                        {p.card_expiry_reminder && <CardExpiryBadge expiry={p.expiry} />}
                     </Section>
                 )}
 
@@ -867,6 +854,27 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+// ─── Card expiry badge ────────────────────────────────────────
+function CardExpiryBadge({ expiry }: { expiry: string }) {
+    const parts = expiry.split('/');
+    if (parts.length < 2) return null;
+    const m = parseInt(parts[0]);
+    const y = parseInt(parts[1]);
+    if (isNaN(m) || isNaN(y)) return null;
+    const exp = new Date(2000 + y, m - 1, 1);
+    const diffDays = Math.round((exp.getTime() - Date.now()) / 86400000);
+    const color = diffDays < 0 ? '#ff453a' : diffDays < 30 ? '#ff9f0a' : '#32d74b';
+    const label = diffDays < 0 ? 'Abgelaufen' : diffDays < 30 ? `Läuft in ${diffDays} Tagen ab` : `Gültig noch ${diffDays} Tage`;
+    return (
+        <div className="px-4 py-2.5 border-t flex items-center gap-2" style={{ borderColor: 'var(--border-2)' }}>
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="none" stroke={color} strokeWidth="1.5">
+                <circle cx="10" cy="10" r="8" /><path d="M10 6v4l3 3" strokeLinecap="round" />
+            </svg>
+            <span className="text-xs font-medium" style={{ color }}>{label}</span>
         </div>
     );
 }
