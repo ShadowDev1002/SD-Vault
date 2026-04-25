@@ -15,6 +15,7 @@ interface Props {
     onSelect: (id: string) => void;
     onAdd: (cat: Category) => void;
     onLock: () => void;
+    onDeleted: () => void;
 }
 
 const CATEGORY_CHIPS: { key: ViewCategory; label: string }[] = [
@@ -41,7 +42,7 @@ const CATEGORY_ICONS: Record<Category, JSX.Element> = {
 
 export default function MobileVaultList({
     items, activeCategory, activeTag, allTags, search, onSearchChange,
-    onCategoryChange, onTagChange, onSelect, onAdd, onLock,
+    onCategoryChange, onTagChange, onSelect, onAdd, onLock, onDeleted,
 }: Props) {
     const [sheetOpen, setSheetOpen] = useState(false);
     const swipeStartX = useRef<number>(0);
@@ -49,13 +50,26 @@ export default function MobileVaultList({
     const swipeOffset = useRef<Map<string, number>>(new Map());
 
     function handleSwipeStart(id: string, x: number) {
+        // close any previously open row
+        swipeEl.current.forEach((el, key) => {
+            if (key !== id) {
+                el.style.transform = 'translateX(0)';
+                swipeOffset.current.set(key, 0);
+            }
+        });
         swipeStartX.current = x;
         swipeOffset.current.set(id, 0);
     }
 
     function handleSwipeMove(id: string, x: number) {
         const delta = swipeStartX.current - x;
-        if (delta < 0) return;
+        if (delta < 0) {
+            // swiping right — snap back
+            const el = swipeEl.current.get(id);
+            if (el) el.style.transform = 'translateX(0)';
+            swipeOffset.current.set(id, 0);
+            return;
+        }
         const el = swipeEl.current.get(id);
         if (el) el.style.transform = `translateX(-${Math.min(delta, 80)}px)`;
         swipeOffset.current.set(id, delta);
@@ -75,6 +89,9 @@ export default function MobileVaultList({
         await invoke('delete_item', { id });
         const el = swipeEl.current.get(id);
         if (el) el.style.transform = 'translateX(0)';
+        swipeEl.current.delete(id);
+        swipeOffset.current.delete(id);
+        onDeleted();
     }
 
     function subtitle(item: Item): string {
