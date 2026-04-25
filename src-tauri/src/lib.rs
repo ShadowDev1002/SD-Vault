@@ -4,7 +4,10 @@ pub mod db;
 pub mod emergency_kit;
 pub mod sync;
 
-use dirs::{data_dir, document_dir};
+#[cfg(not(target_os = "android"))]
+use dirs::document_dir;
+#[cfg(target_os = "android")]
+use dirs::data_dir;
 use rusqlite::Connection;
 use std::fs;
 use std::path::PathBuf;
