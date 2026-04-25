@@ -6,14 +6,19 @@ pub mod sync;
 
 #[cfg(not(target_os = "android"))]
 use dirs::document_dir;
-#[cfg(target_os = "android")]
-use dirs::data_dir;
 use rusqlite::Connection;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use zeroize::Zeroizing;
+
+// Android: Tauri setzt den App-Datenpfad via setup-Hook, da dirs::data_dir() None liefert.
+static ANDROID_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+pub(crate) fn init_android_data_dir(path: PathBuf) {
+    let _ = ANDROID_DATA_DIR.set(path);
+}
 
 pub struct AppState {
     pub master_key: Mutex<Option<Zeroizing<[u8; 32]>>>,
@@ -34,9 +39,12 @@ impl Default for AppState {
 }
 
 pub(crate) fn get_vault_dir() -> Result<PathBuf, String> {
-    // Android hat kein Document-Verzeichnis — App-privaten Datenpfad nutzen
     #[cfg(target_os = "android")]
-    let base = data_dir().ok_or("Kein Datenpfad gefunden")?;
+    let base = ANDROID_DATA_DIR
+        .get()
+        .cloned()
+        .ok_or("App-Datenpfad nicht initialisiert")?;
+
     #[cfg(not(target_os = "android"))]
     let base = document_dir().ok_or("Dokumente-Ordner nicht gefunden")?;
 
@@ -138,8 +146,6 @@ pub(crate) fn clear_lockout_file() {
     }
 }
 
-/// Liest den persistierten Lockout-Zeitstempel und gibt einen Instant zurück,
-/// falls die Sperre noch aktiv ist.
 pub(crate) fn read_lockout_until() -> Option<Instant> {
     let path = lockout_path().ok()?;
     let content = fs::read_to_string(path).ok()?;
@@ -175,7 +181,6 @@ pub(crate) fn read_recovery_wrap() -> Result<Vec<u8>, String> {
     fs::read(recovery_path()?).map_err(|e| format!("vault.recovery nicht gefunden: {}", e))
 }
 
-/// Speichert den Secret Key gerätebunden (chmod 600). Wird nie synchronisiert.
 pub(crate) fn write_secret_key(key_bytes: &[u8; 32]) -> Result<(), String> {
     let path = secret_key_path()?;
     fs::write(&path, key_bytes.as_ref()).map_err(|e| e.to_string())?;
@@ -204,6 +209,16 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|_app| {
+            #[cfg(target_os = "android")]
+            {
+                use tauri::Manager;
+                let data_dir = _app.path().app_data_dir()
+                    .map_err(|e| format!("App-Datenpfad: {e}"))?;
+                init_android_data_dir(data_dir);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::vault_exists,
             commands::create_vault,
