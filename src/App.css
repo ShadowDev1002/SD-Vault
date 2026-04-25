@@ -217,3 +217,13 @@ body {
         -webkit-overflow-scrolling: touch;
     }
 }
+
+/* ─── Mobile page slide transition ─── */
+.slide-enter  { transform: translateX(100%); }
+.slide-active { transform: translateX(0);    transition: transform 280ms ease-out; }
+.slide-exit   { transform: translateX(100%); transition: transform 240ms ease-in;  }
+
+/* ─── Bottom sheet transition ─── */
+.sheet-enter  { transform: translateY(100%); }
+.sheet-active { transform: translateY(0);    transition: transform 280ms ease-out; }
+.sheet-exit   { transform: translateY(100%); transition: transform 240ms ease-in;  }
