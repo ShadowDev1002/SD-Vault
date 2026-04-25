@@ -255,7 +255,6 @@ export default function VaultView({ meta: _meta, onLocked, onSettings, hasUpdate
                     activeCategory={activeCategory}
                     onCategoryChange={handleCategoryChange}
                     onSettings={onSettings}
-                    onLock={handleLock}
                     hasUpdate={hasUpdate}
                 />
             </div>
