@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+    <id>de.shadowdev.SDVault</id>
+    <metadata_license>MIT</metadata_license>
+    <project_license>MIT</project_license>
+
+    <name>SD-Vault</name>
+    <summary>Sicherer lokaler Passwort-Manager mit AES-256-GCM Verschlüsselung</summary>
+
+    <developer id="de.shadowdev">
+        <name>ShadowDev</name>
+    </developer>
+
+    <description>
+        <p>
+            SD-Vault ist ein quelloffener, lokal gespeicherter Passwort-Manager mit
+            AES-256-GCM Verschlüsselung, SQLCipher-Backend und einem zweiten Secret Key
+            als Geräteschutz. Alle Daten bleiben ausschließlich auf deinem Gerät.
+        </p>
+        <ul>
+            <li>AES-256-GCM Verschlüsselung mit HKDF-SHA256 Key-Derivation</li>
+            <li>Dual-Key: Master-Passwort + 256-bit Secret Key</li>
+            <li>Kategorien: Logins, Karten, Notizen, Identitäten</li>
+            <li>TOTP (2FA) mit QR-Code-Anzeige und Backup-Codes</li>
+            <li>Tags, Favoriten und Passwort-Gesundheits-Dashboard</li>
+            <li>Sync via WebDAV, SFTP oder lokales Netzwerk</li>
+            <li>Anhänge, PDF-Export und Notfall-Kit</li>
+        </ul>
+    </description>
+
+    <launchable type="desktop-id">SD-Vault.desktop</launchable>
+
+    <url type="homepage">https://github.com/ShadowDev1002/SD-Vault</url>
+    <url type="bugtracker">https://github.com/ShadowDev1002/SD-Vault/issues</url>
+    <url type="vcs-browser">https://github.com/ShadowDev1002/SD-Vault</url>
+
+    <screenshots>
+        <screenshot type="default">
+            <caption>Vault-Übersicht mit Eintrags-Liste und Detail-Ansicht</caption>
+        </screenshot>
+    </screenshots>
+
+    <releases>
+        <release version="1.1.0" date="2026-04-25">
+            <url type="details">https://github.com/ShadowDev1002/SD-Vault/releases/tag/v1.1.0</url>
+            <description>
+                <p>Favoriten, Tags, TOTP QR-Code, Backup-Codes, Karten-Ablauf-Erinnerung, 256-bit Secret Key</p>
+            </description>
+        </release>
+        <release version="1.0.1" date="2026-04-25">
+            <url type="details">https://github.com/ShadowDev1002/SD-Vault/releases/tag/v1.0.1</url>
+        </release>
+        <release version="1.0.0" date="2026-04-24">
+            <url type="details">https://github.com/ShadowDev1002/SD-Vault/releases/tag/v1.0.0</url>
+        </release>
+    </releases>
+
+    <content_rating type="oars-1.1" />
+
+    <categories>
+        <category>Utility</category>
+        <category>Security</category>
+    </categories>
+
+    <keywords>
+        <keyword>Passwort</keyword>
+        <keyword>Password</keyword>
+        <keyword>Manager</keyword>
+        <keyword>Sicherheit</keyword>
+        <keyword>Verschlüsselung</keyword>
+        <keyword>2FA</keyword>
+        <keyword>TOTP</keyword>
+    </keywords>
+</component>

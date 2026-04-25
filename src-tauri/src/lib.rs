@@ -4,7 +4,7 @@ pub mod db;
 pub mod emergency_kit;
 pub mod sync;
 
-use dirs::document_dir;
+use dirs::{data_dir, document_dir};
 use rusqlite::Connection;
 use std::fs;
 use std::path::PathBuf;
@@ -31,8 +31,13 @@ impl Default for AppState {
 }
 
 pub(crate) fn get_vault_dir() -> Result<PathBuf, String> {
-    let docs = document_dir().ok_or("Dokumente-Ordner nicht gefunden")?;
-    let dir = docs.join("SD-Vault");
+    // Android hat kein Document-Verzeichnis — App-privaten Datenpfad nutzen
+    #[cfg(target_os = "android")]
+    let base = data_dir().ok_or("Kein Datenpfad gefunden")?;
+    #[cfg(not(target_os = "android"))]
+    let base = document_dir().ok_or("Dokumente-Ordner nicht gefunden")?;
+
+    let dir = base.join("SD-Vault");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }
