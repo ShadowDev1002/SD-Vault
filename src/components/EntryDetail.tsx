@@ -6,6 +6,7 @@ import { copyToClipboard } from '../utils/clipboard';
 import { measureStrength } from '../utils/strength';
 import { generateTotp } from '../utils/totp';
 import { checkHibp } from '../utils/hibp';
+import { useMobile } from '../utils/mobile';
 
 interface Props {
     item: Item | null;
@@ -53,6 +54,7 @@ function VField({
     label: string; value: string; secret?: boolean; mono?: boolean;
     onCopy?: () => void; onOpen?: () => void;
 }) {
+    const isMobile = useMobile();
     const [revealed, setRevealed] = useState(false);
     const display = !value
         ? <span style={{ color: 'var(--text-3)' }}>—</span>
@@ -66,7 +68,7 @@ function VField({
                 <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text-3)' }}>{label}</p>
                 <p className="text-sm break-all" style={{ color: 'var(--text)' }}>{display}</p>
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-4">
+            <div className={`flex items-center gap-1 ${isMobile ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity shrink-0 mt-4`}>
                 {secret && value && (
                     <SmBtn onClick={() => setRevealed(r => !r)} title={revealed ? 'Verbergen' : 'Anzeigen'}>
                         {revealed ? <EyeOffSvg /> : <EyeSvg />}
@@ -81,6 +83,7 @@ function VField({
 
 // ─── TOTP live code ────────────────────────────────────────────
 function TotpField({ secret, onCopy }: { secret: string; onCopy: () => void }) {
+    const isMobile = useMobile();
     const [code, setCode] = useState('------');
     const [remaining, setRemaining] = useState(30);
     const [err, setErr] = useState(false);
@@ -129,7 +132,7 @@ function TotpField({ secret, onCopy }: { secret: string; onCopy: () => void }) {
                     </div>
                 )}
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-4">
+            <div className={`flex items-center gap-1 ${isMobile ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity shrink-0 mt-4`}>
                 {!err && <SmBtn onClick={onCopy} title="Kopieren"><CopySvg /></SmBtn>}
             </div>
         </div>
@@ -171,6 +174,7 @@ function EField({
 
 // ─── Main component ────────────────────────────────────────────
 export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew, newCategory }: Props) {
+    const isMobile = useMobile();
     const [p, setP] = useState<ItemPayload>(item?.payload ?? { ...EMPTY_PAYLOAD });
     const [cat, setCat] = useState<Category>(item?.category ?? newCategory ?? 'login');
     const [showPw, setShowPw] = useState(false);
@@ -825,7 +829,7 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                                     <p className="text-sm truncate" style={{ color: 'var(--text)' }}>{att.name}</p>
                                     <p className="text-xs" style={{ color: 'var(--text-3)' }}>{(att.size / 1024).toFixed(1)} KB</p>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className={`flex items-center gap-1 ${isMobile ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                                     <SmBtn onClick={() => handleDownloadAttachment(att)} title="Herunterladen">
                                         <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
                                             <path d="M8 2v8M5 7l3 3 3-3" strokeLinecap="round" strokeLinejoin="round"/>

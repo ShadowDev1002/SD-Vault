@@ -38,7 +38,7 @@ export default function MobileDetailScreen({ item, isNew, newCategory, onSaved, 
         <div
             className={visible ? 'slide-active' : 'slide-enter'}
             style={{
-                position: 'fixed', inset: 0, zIndex: 30,
+                position: 'fixed', inset: 0, zIndex: 60,
                 backgroundColor: 'var(--vault-bg)',
                 display: 'flex', flexDirection: 'column',
                 overflowY: 'auto',
