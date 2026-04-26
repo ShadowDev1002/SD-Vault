@@ -1,7 +1,15 @@
 import { useState, useRef } from 'react';
-import type { Item, Category } from '../types';
-import type { ViewCategory } from './Sidebar';
+import type { Item, Category, ViewCategory } from '../types';
 import { invoke } from '@tauri-apps/api/core';
+import { CATEGORY_COLORS, CategoryIcon } from '../utils/categories';
+
+const CATEGORY_CHIPS: { key: ViewCategory; label: string }[] = [
+    { key: 'all',      label: 'Alle' },
+    { key: 'login',    label: 'Login' },
+    { key: 'card',     label: 'Karte' },
+    { key: 'note',     label: 'Notiz' },
+    { key: 'identity', label: 'Identität' },
+];
 
 interface Props {
     items: Item[];
@@ -18,28 +26,6 @@ interface Props {
     onDeleted: () => void;
 }
 
-const CATEGORY_CHIPS: { key: ViewCategory; label: string }[] = [
-    { key: 'all',      label: 'Alle' },
-    { key: 'login',    label: 'Login' },
-    { key: 'card',     label: 'Karte' },
-    { key: 'note',     label: 'Notiz' },
-    { key: 'identity', label: 'Identität' },
-];
-
-const CATEGORY_COLORS: Record<Category, string> = {
-    login:    '#0a84ff',
-    card:     '#32d74b',
-    note:     '#ff9f0a',
-    identity: '#bf5af2',
-};
-
-const CATEGORY_ICONS: Record<Category, JSX.Element> = {
-    login:    <KeyIcon />,
-    card:     <CardIcon />,
-    note:     <NoteIcon />,
-    identity: <PersonIcon />,
-};
-
 export default function MobileVaultList({
     items, activeCategory, activeTag, allTags, search, onSearchChange,
     onCategoryChange, onTagChange, onSelect, onAdd, onLock, onDeleted,
@@ -50,7 +36,6 @@ export default function MobileVaultList({
     const swipeOffset = useRef<Map<string, number>>(new Map());
 
     function handleSwipeStart(id: string, x: number) {
-        // close any previously open row
         swipeEl.current.forEach((el, key) => {
             if (key !== id) {
                 el.style.transform = 'translateX(0)';
@@ -64,7 +49,6 @@ export default function MobileVaultList({
     function handleSwipeMove(id: string, x: number) {
         const delta = swipeStartX.current - x;
         if (delta < 0) {
-            // swiping right — snap back
             const el = swipeEl.current.get(id);
             if (el) el.style.transform = 'translateX(0)';
             swipeOffset.current.set(id, 0);
@@ -212,8 +196,7 @@ export default function MobileVaultList({
                     </div>
                 ) : (
                     items.map(item => {
-                        const cat = item.category as Category;
-                        const color = CATEGORY_COLORS[cat] ?? '#8e8e93';
+                        const color = CATEGORY_COLORS[item.category] ?? '#8e8e93';
                         return (
                             <div key={item.id} className="relative overflow-hidden">
                                 {/* Delete button behind the row */}
@@ -240,17 +223,7 @@ export default function MobileVaultList({
                                     onTouchMove={e => handleSwipeMove(item.id, e.touches[0].clientX)}
                                     onTouchEnd={() => handleSwipeEnd(item.id)}
                                 >
-                                    {/* Icon */}
-                                    <div
-                                        className="flex items-center justify-center shrink-0"
-                                        style={{
-                                            width: 40, height: 40, borderRadius: 10,
-                                            background: `linear-gradient(135deg, ${color}cc, ${color}66)`,
-                                            color: 'white',
-                                        }}
-                                    >
-                                        <span className="w-5 h-5">{CATEGORY_ICONS[cat]}</span>
-                                    </div>
+                                    <CategoryIcon category={item.category} size={40} />
 
                                     {/* Text */}
                                     <div className="flex-1 min-w-0">
@@ -295,7 +268,7 @@ export default function MobileVaultList({
 
             {/* Category Sheet */}
             {sheetOpen && (
-                <MobileCategorySheetInline
+                <MobileCategorySheet
                     onSelect={cat => { setSheetOpen(false); onAdd(cat); }}
                     onClose={() => setSheetOpen(false)}
                 />
@@ -304,12 +277,12 @@ export default function MobileVaultList({
     );
 }
 
-function MobileCategorySheetInline({ onSelect, onClose }: { onSelect: (cat: Category) => void; onClose: () => void }) {
-    const CATS: { cat: Category; label: string; color: string; icon: JSX.Element }[] = [
-        { cat: 'login',    label: 'Login',     color: '#0a84ff', icon: <KeyIcon /> },
-        { cat: 'card',     label: 'Karte',     color: '#32d74b', icon: <CardIcon /> },
-        { cat: 'note',     label: 'Notiz',     color: '#ff9f0a', icon: <NoteIcon /> },
-        { cat: 'identity', label: 'Identität', color: '#bf5af2', icon: <PersonIcon /> },
+function MobileCategorySheet({ onSelect, onClose }: { onSelect: (cat: Category) => void; onClose: () => void }) {
+    const CATS: { cat: Category; label: string }[] = [
+        { cat: 'login',    label: 'Login' },
+        { cat: 'card',     label: 'Karte' },
+        { cat: 'note',     label: 'Notiz' },
+        { cat: 'identity', label: 'Identität' },
     ];
     return (
         <>
@@ -325,14 +298,14 @@ function MobileCategorySheetInline({ onSelect, onClose }: { onSelect: (cat: Cate
                     Neuen Eintrag erstellen
                 </p>
                 <div className="grid grid-cols-2 gap-2 px-4 pb-6">
-                    {CATS.map(({ cat, label, color, icon }) => (
+                    {CATS.map(({ cat, label }) => (
                         <button
                             key={cat}
                             onClick={() => onSelect(cat)}
                             className="flex items-center justify-center gap-2 rounded-xl"
-                            style={{ height: 60, backgroundColor: 'var(--surface-2)', color: color }}
+                            style={{ height: 60, backgroundColor: 'var(--surface-2)', color: CATEGORY_COLORS[cat] }}
                         >
-                            <span className="w-5 h-5">{icon}</span>
+                            <CategoryIcon category={cat} size={24} />
                             <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{label}</span>
                         </button>
                     ))}
@@ -347,36 +320,6 @@ function LockIcon() {
         <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5">
             <rect x="4" y="9" width="12" height="9" rx="2" />
             <path d="M7 9V7a3 3 0 016 0v2" strokeLinecap="round" />
-        </svg>
-    );
-}
-function KeyIcon() {
-    return (
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <circle cx="6" cy="8" r="4" /><path d="M10 8h5M13 6v4" strokeLinecap="round" />
-        </svg>
-    );
-}
-function CardIcon() {
-    return (
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="1" y="3" width="14" height="10" rx="1.5" /><path d="M1 6h14" strokeLinecap="round" />
-        </svg>
-    );
-}
-function NoteIcon() {
-    return (
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="2" y="1" width="12" height="14" rx="1.5" />
-            <path d="M5 5h6M5 8h6M5 11h4" strokeLinecap="round" />
-        </svg>
-    );
-}
-function PersonIcon() {
-    return (
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <circle cx="8" cy="5" r="3" />
-            <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" strokeLinecap="round" />
         </svg>
     );
 }

@@ -1,4 +1,6 @@
 export type Category = 'login' | 'card' | 'note' | 'identity';
+export type ViewCategory = Category | 'all' | 'health' | 'favorites';
+export type SortOption = 'alpha-asc' | 'alpha-desc' | 'date-new' | 'date-old' | 'strength';
 export type FieldType = 'text' | 'password' | 'url' | 'email' | 'phone' | 'date';
 
 export interface CustomField {

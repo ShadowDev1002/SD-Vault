@@ -50,12 +50,11 @@ function formatDate(ts: number) {
 
 // ─── View mode field ───────────────────────────────────────────
 function VField({
-    label, value, secret = false, mono = false, onCopy, onOpen,
+    label, value, secret = false, mono = false, onCopy, onOpen, isMobile = false,
 }: {
     label: string; value: string; secret?: boolean; mono?: boolean;
-    onCopy?: () => void; onOpen?: () => void;
+    onCopy?: () => void; onOpen?: () => void; isMobile?: boolean;
 }) {
-    const isMobile = useMobile();
     const [revealed, setRevealed] = useState(false);
     const display = !value
         ? <span style={{ color: 'var(--text-3)' }}>—</span>
@@ -83,8 +82,7 @@ function VField({
 }
 
 // ─── TOTP live code ────────────────────────────────────────────
-function TotpField({ secret, onCopy }: { secret: string; onCopy: () => void }) {
-    const isMobile = useMobile();
+function TotpField({ secret, onCopy, isMobile = false }: { secret: string; onCopy: () => void; isMobile?: boolean }) {
     const [code, setCode] = useState('------');
     const [remaining, setRemaining] = useState(30);
     const [err, setErr] = useState(false);
@@ -721,8 +719,8 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
                 {cat === 'login' && (
                     <Section title="Anmeldedaten">
-                        <VField label="Benutzername" value={p.username} onCopy={() => cp(p.username, 'username')} />
-                        <VField label="Passwort" value={p.password} secret mono onCopy={() => cp(p.password, 'password')} />
+                        <VField label="Benutzername" value={p.username} onCopy={() => cp(p.username, 'username')} isMobile={isMobile} />
+                        <VField label="Passwort" value={p.password} secret mono onCopy={() => cp(p.password, 'password')} isMobile={isMobile} />
                         {p.password && (
                             <div className="px-4 py-2 flex items-center gap-3 border-b" style={{ borderColor: 'var(--border-2)' }}>
                                 <button
@@ -746,9 +744,9 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                                 {hibpCount === -1 && <span className="text-xs" style={{ color: 'var(--text-3)' }}>Prüfung fehlgeschlagen</span>}
                             </div>
                         )}
-                        <VField label="Website" value={p.url} onCopy={() => cp(p.url, 'url')} onOpen={() => openUrl(p.url)} />
+                        <VField label="Website" value={p.url} onCopy={() => cp(p.url, 'url')} onOpen={() => openUrl(p.url)} isMobile={isMobile} />
                         {p.totp && (
-                            <TotpField secret={p.totp} onCopy={async () => {
+                            <TotpField secret={p.totp} isMobile={isMobile} onCopy={async () => {
                                 try { const { code } = await generateTotp(p.totp); copyToClipboard(code); } catch {}
                             }} />
                         )}
@@ -792,38 +790,38 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
 
                 {cat === 'card' && (
                     <Section title="Kartendaten">
-                        <VField label="Karteninhaber" value={p.cardholder} onCopy={() => cp(p.cardholder, 'cardholder')} />
-                        <VField label="Kartennummer" value={p.card_number} secret mono onCopy={() => cp(p.card_number, 'card_number')} />
-                        <VField label="Ablaufdatum" value={p.expiry} onCopy={() => cp(p.expiry, 'expiry')} />
-                        <VField label="CVV" value={p.cvv} secret mono onCopy={() => cp(p.cvv, 'cvv')} />
-                        {p.pin && <VField label="PIN" value={p.pin} secret mono onCopy={() => cp(p.pin, 'pin')} />}
+                        <VField label="Karteninhaber" value={p.cardholder} onCopy={() => cp(p.cardholder, 'cardholder')} isMobile={isMobile} />
+                        <VField label="Kartennummer" value={p.card_number} secret mono onCopy={() => cp(p.card_number, 'card_number')} isMobile={isMobile} />
+                        <VField label="Ablaufdatum" value={p.expiry} onCopy={() => cp(p.expiry, 'expiry')} isMobile={isMobile} />
+                        <VField label="CVV" value={p.cvv} secret mono onCopy={() => cp(p.cvv, 'cvv')} isMobile={isMobile} />
+                        {p.pin && <VField label="PIN" value={p.pin} secret mono onCopy={() => cp(p.pin, 'pin')} isMobile={isMobile} />}
                         {p.card_expiry_reminder && <CardExpiryBadge expiry={p.expiry} />}
                     </Section>
                 )}
 
                 {cat === 'identity' && (<>
                     <Section title="Persönliche Daten">
-                        <VField label="Vorname"   value={p.first_name} onCopy={() => cp(p.first_name, 'fn')} />
-                        <VField label="Nachname"  value={p.last_name}  onCopy={() => cp(p.last_name,  'ln')} />
-                        {p.birthday && <VField label="Geburtstag" value={p.birthday} />}
+                        <VField label="Vorname"   value={p.first_name} onCopy={() => cp(p.first_name, 'fn')} isMobile={isMobile} />
+                        <VField label="Nachname"  value={p.last_name}  onCopy={() => cp(p.last_name,  'ln')} isMobile={isMobile} />
+                        {p.birthday && <VField label="Geburtstag" value={p.birthday} isMobile={isMobile} />}
                     </Section>
                     {(p.email || p.phone) && (
                         <Section title="Kontakt">
-                            {p.email && <VField label="E-Mail"   value={p.email} onCopy={() => cp(p.email, 'email')} />}
-                            {p.phone && <VField label="Telefon"  value={p.phone} onCopy={() => cp(p.phone, 'phone')} />}
+                            {p.email && <VField label="E-Mail"   value={p.email} onCopy={() => cp(p.email, 'email')} isMobile={isMobile} />}
+                            {p.phone && <VField label="Telefon"  value={p.phone} onCopy={() => cp(p.phone, 'phone')} isMobile={isMobile} />}
                         </Section>
                     )}
                     {(p.company || p.job_title) && (
                         <Section title="Beruf">
-                            {p.company   && <VField label="Unternehmen" value={p.company}   onCopy={() => cp(p.company,   'company')} />}
-                            {p.job_title && <VField label="Position"    value={p.job_title} onCopy={() => cp(p.job_title, 'job')} />}
+                            {p.company   && <VField label="Unternehmen" value={p.company}   onCopy={() => cp(p.company,   'company')} isMobile={isMobile} />}
+                            {p.job_title && <VField label="Position"    value={p.job_title} onCopy={() => cp(p.job_title, 'job')} isMobile={isMobile} />}
                         </Section>
                     )}
                     {(p.address || p.city) && (
                         <Section title="Adresse">
-                            {p.address && <VField label="Straße"  value={p.address} />}
-                            {p.city    && <VField label="Stadt"   value={`${p.zip ? p.zip + ' ' : ''}${p.city}`} />}
-                            {p.country && <VField label="Land"    value={p.country} />}
+                            {p.address && <VField label="Straße"  value={p.address} isMobile={isMobile} />}
+                            {p.city    && <VField label="Stadt"   value={`${p.zip ? p.zip + ' ' : ''}${p.city}`} isMobile={isMobile} />}
+                            {p.country && <VField label="Land"    value={p.country} isMobile={isMobile} />}
                         </Section>
                     )}
                 </>)}
@@ -859,6 +857,7 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                                 value={f.value}
                                 secret={f.field_type === 'password'}
                                 onCopy={() => cp(f.value, f.id)}
+                                isMobile={isMobile}
                             />
                         ))}
                     </Section>

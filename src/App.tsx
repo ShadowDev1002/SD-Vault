@@ -5,11 +5,9 @@ import FirstRunSetup from './components/FirstRunSetup';
 import VaultView from './components/VaultView';
 import Settings from './components/Settings';
 import type { VaultMeta } from './types';
-import { APP_VERSION } from './components/Sidebar';
+import { APP_VERSION, GITHUB_REPO } from './utils/constants';
 import { getTheme, applyTheme, type Theme, getAccentColor, applyAccentColor } from './utils/theme';
 import './App.css';
-
-const GITHUB_REPO = 'ShadowDev1002/SD-Vault';
 
 type AppState = 'loading' | 'first-run' | 'locked' | 'unlocked';
 
