@@ -2,7 +2,8 @@
   "app-id": "de.shadowdev.sd-vault",
   "runtime": "org.gnome.Platform",
   "runtime-version": "48",
-  "sdk": "org.freedesktop.Sdk//24.08",
+  "sdk": "org.gnome.Sdk",
+  "sdk-version": "48",
   "command": "sd-vault-wrapper",
   "finish-args": [
     "--share=network",

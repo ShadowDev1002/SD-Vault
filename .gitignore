@@ -3,11 +3,27 @@ dist/
 target/
 *.db
 *.salt
+
+# Build-Outputs
 release/
 flatpak-repo/
 flatpak-build/
 .flatpak-builder/
-build/windows/*.exe
-build/windows/sd-vault.exe
-build/windows/icon.ico
+flatpak/repo/
+build/android/
+build/windows/
+
+# Binäre Artefakte (werden über GitHub Releases verteilt)
+*.apk
+*.apk.idsig
+*.flatpak
+*.AppImage
+*.deb
+*.rpm
+*.exe
+
+# Tool-spezifisch
 .worktrees/
+.claude/
+.remember/
+docs/superpowers/
