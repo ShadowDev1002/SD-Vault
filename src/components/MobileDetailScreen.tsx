@@ -41,12 +41,12 @@ export default function MobileDetailScreen({ item, isNew, newCategory, onSaved, 
                 position: 'fixed', inset: 0, zIndex: 60,
                 backgroundColor: 'var(--vault-bg)',
                 display: 'flex', flexDirection: 'column',
-                overflowY: 'auto',
+                overflow: 'hidden',
             }}
         >
-            {/* Sticky header */}
+            {/* Navigation header */}
             <div
-                className="flex items-center justify-between px-4 shrink-0 border-b sticky top-0 z-10"
+                className="flex items-center justify-between px-4 shrink-0 border-b"
                 style={{ height: 52, backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
             >
                 <button
@@ -63,8 +63,8 @@ export default function MobileDetailScreen({ item, isNew, newCategory, onSaved, 
                 <div style={{ width: 44 }} />
             </div>
 
-            {/* EntryDetail body */}
-            <div className="flex-1">
+            {/* EntryDetail body — fills remaining height, handles its own scrolling */}
+            <div className="flex-1" style={{ minHeight: 0, overflow: 'hidden' }}>
                 <EntryDetail
                     item={isNew ? null : item}
                     onSaved={handleSaved}
@@ -72,6 +72,7 @@ export default function MobileDetailScreen({ item, isNew, newCategory, onSaved, 
                     onCancel={handleBack}
                     isNew={isNew}
                     newCategory={newCategory}
+                    isMobile
                 />
             </div>
         </div>

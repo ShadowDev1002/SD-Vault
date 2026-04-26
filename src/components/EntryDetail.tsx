@@ -15,6 +15,7 @@ interface Props {
     onCancel: () => void;
     isNew?: boolean;
     newCategory?: Category;
+    isMobile?: boolean;
 }
 
 const EMPTY_PAYLOAD: ItemPayload = {
@@ -173,8 +174,9 @@ function EField({
 }
 
 // ─── Main component ────────────────────────────────────────────
-export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew, newCategory }: Props) {
-    const isMobile = useMobile();
+export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew, newCategory, isMobile: isMobileProp }: Props) {
+    const isMobileHook = useMobile();
+    const isMobile = isMobileProp ?? isMobileHook;
     const [p, setP] = useState<ItemPayload>(item?.payload ?? { ...EMPTY_PAYLOAD });
     const [cat, setCat] = useState<Category>(item?.category ?? newCategory ?? 'login');
     const [showPw, setShowPw] = useState(false);
@@ -337,33 +339,46 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
     // ── EDIT MODE ──────────────────────────────────────────────
     if (editing) {
         return (
-            <div className="flex-1 flex flex-col h-full anim-slide-right">
+            <div className="flex-1 flex flex-col min-h-0 h-full anim-slide-right">
                 {/* Toolbar */}
-                <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: meta.color }}>
-                        <CategorySvg cat={cat} />
+                {isMobile ? (
+                    <div className="px-4 py-3 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
+                        <input
+                            value={p.title}
+                            onChange={e => set('title', e.target.value)}
+                            placeholder="Titel"
+                            className="w-full bg-transparent text-base font-semibold focus:outline-none"
+                            style={{ color: 'var(--text)' }}
+                            autoFocus={!p.title}
+                        />
                     </div>
-                    <input
-                        value={p.title}
-                        onChange={e => set('title', e.target.value)}
-                        placeholder="Titel"
-                        className="flex-1 bg-transparent text-base font-semibold focus:outline-none border-b border-transparent focus:border-current transition-colors"
-                        style={{ color: 'var(--text)' }}
-                        autoFocus={!p.title}
-                    />
-                    <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={isNew ? onCancel : () => { setEditing(false); setP(item!.payload); }}
-                            className="text-xs px-3 py-1.5 rounded-lg border transition-colors"
-                            style={{ borderColor: 'var(--border)', color: 'var(--text-2)' }}>
-                            Abbrechen
-                        </button>
-                        <button onClick={handleSave} disabled={loading}
-                            className="text-xs px-4 py-1.5 rounded-lg font-semibold text-white disabled:opacity-50"
-                            style={{ background: 'var(--accent)' }}>
-                            {loading ? 'Speichern…' : 'Speichern'}
-                        </button>
+                ) : (
+                    <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: meta.color }}>
+                            <CategorySvg cat={cat} />
+                        </div>
+                        <input
+                            value={p.title}
+                            onChange={e => set('title', e.target.value)}
+                            placeholder="Titel"
+                            className="flex-1 bg-transparent text-base font-semibold focus:outline-none border-b border-transparent focus:border-current transition-colors"
+                            style={{ color: 'var(--text)' }}
+                            autoFocus={!p.title}
+                        />
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button onClick={isNew ? onCancel : () => { setEditing(false); setP(item!.payload); }}
+                                className="text-xs px-3 py-1.5 rounded-lg border transition-colors"
+                                style={{ borderColor: 'var(--border)', color: 'var(--text-2)' }}>
+                                Abbrechen
+                            </button>
+                            <button onClick={handleSave} disabled={loading}
+                                className="text-xs px-4 py-1.5 rounded-lg font-semibold text-white disabled:opacity-50"
+                                style={{ background: 'var(--accent)' }}>
+                                {loading ? 'Speichern…' : 'Speichern'}
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Category tabs (only when new) */}
                 {isNew && (
@@ -610,6 +625,23 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                             {error}
                         </div>
                     )}
+                    {isMobile && (
+                        <div className="flex gap-3 pt-2 pb-4">
+                            <button
+                                onClick={isNew ? onCancel : () => { setEditing(false); setP(item!.payload); }}
+                                className="flex-1 py-3 rounded-xl border text-sm font-medium"
+                                style={{ borderColor: 'var(--border)', color: 'var(--text-2)' }}>
+                                Abbrechen
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                disabled={loading}
+                                className="flex-1 py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                                style={{ background: 'var(--accent)' }}>
+                                {loading ? 'Speichern…' : 'Speichern'}
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -626,23 +658,16 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                    : '';
 
     return (
-        <div className="flex-1 flex flex-col h-full anim-slide-right">
+        <div className="flex-1 flex flex-col min-h-0 h-full anim-slide-right">
             {/* Header */}
-            <div className="px-6 py-5 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
-                <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-white"
-                        style={{ background: `linear-gradient(135deg, ${meta.color}dd, ${meta.color}88)` }}>
-                        <CategorySvgLg cat={cat} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <h2 className="text-lg font-semibold leading-tight" style={{ color: 'var(--text)' }}>{name}</h2>
-                        {subtitle && <p className="text-sm mt-0.5 truncate" style={{ color: 'var(--text-2)' }}>{subtitle}</p>}
-                        <span className="inline-block mt-1.5 px-2 py-0.5 rounded-md text-xs font-medium"
-                            style={{ background: meta.color + '22', color: meta.color }}>
-                            {meta.label}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
+            {isMobile ? (
+                <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium"
+                        style={{ background: meta.color + '22', color: meta.color }}>
+                        <span className="w-3 h-3"><CategorySvg cat={cat} /></span>
+                        {meta.label}
+                    </span>
+                    <div className="flex items-center gap-0.5">
                         <SmBtn onClick={handleToggleFavorite} title="Favorit">
                             <svg className="w-4 h-4" viewBox="0 0 20 20" fill={p.favorite ? '#ffd60a' : 'none'} stroke={p.favorite ? '#ffd60a' : 'currentColor'} strokeWidth="1.5">
                                 <path d="M10 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L10 14.3l-4.8 2.6.9-5.4L2.2 7.7l5.4-.8L10 2z" strokeLinejoin="round" />
@@ -658,7 +683,39 @@ export default function EntryDetail({ item, onSaved, onDeleted, onCancel, isNew,
                         <SmBtn onClick={handleDelete} title="Löschen" danger><TrashSvg /></SmBtn>
                     </div>
                 </div>
-            </div>
+            ) : (
+                <div className="px-6 py-5 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
+                    <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-white"
+                            style={{ background: `linear-gradient(135deg, ${meta.color}dd, ${meta.color}88)` }}>
+                            <CategorySvgLg cat={cat} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h2 className="text-lg font-semibold leading-tight" style={{ color: 'var(--text)' }}>{name}</h2>
+                            {subtitle && <p className="text-sm mt-0.5 truncate" style={{ color: 'var(--text-2)' }}>{subtitle}</p>}
+                            <span className="inline-block mt-1.5 px-2 py-0.5 rounded-md text-xs font-medium"
+                                style={{ background: meta.color + '22', color: meta.color }}>
+                                {meta.label}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <SmBtn onClick={handleToggleFavorite} title="Favorit">
+                                <svg className="w-4 h-4" viewBox="0 0 20 20" fill={p.favorite ? '#ffd60a' : 'none'} stroke={p.favorite ? '#ffd60a' : 'currentColor'} strokeWidth="1.5">
+                                    <path d="M10 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L10 14.3l-4.8 2.6.9-5.4L2.2 7.7l5.4-.8L10 2z" strokeLinejoin="round" />
+                                </svg>
+                            </SmBtn>
+                            <SmBtn onClick={handleExportPdf} title="Als PDF exportieren">
+                                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                    <path d="M4 2h6l4 4v8a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" strokeLinejoin="round"/>
+                                    <path d="M9 2v4h4M6 9h4M6 12h2" strokeLinecap="round"/>
+                                </svg>
+                            </SmBtn>
+                            <SmBtn onClick={() => setEditing(true)} title="Bearbeiten"><EditSvg /></SmBtn>
+                            <SmBtn onClick={handleDelete} title="Löschen" danger><TrashSvg /></SmBtn>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
