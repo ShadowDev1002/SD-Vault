@@ -4,12 +4,10 @@ import logoUrl from '../assets/logo.svg';
 import SecuritySettings from './SecuritySettings';
 import AppearanceSettings from './AppearanceSettings';
 import SyncSettings from './SyncSettings';
-import { APP_VERSION } from './Sidebar';
+import { APP_VERSION, GITHUB_REPO } from '../utils/constants';
 import type { UpdateInfo } from '../App';
 import type { Theme } from '../utils/theme';
 import { useMobile } from '../utils/mobile';
-
-const GITHUB_REPO = 'ShadowDev1002/SD-Vault';
 
 type Tab = 'security' | 'appearance' | 'sync' | 'about';
 type UpdateState = 'idle' | 'checking' | 'up-to-date' | 'available' | 'error';

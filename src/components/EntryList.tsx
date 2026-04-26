@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { Item, Category } from '../types';
+import type { Item, Category, SortOption } from '../types';
+import { CATEGORY_LABELS, CATEGORIES, CategoryIcon } from '../utils/categories';
 
-export type SortOption = 'alpha-asc' | 'alpha-desc' | 'date-new' | 'date-old' | 'strength';
+export type { SortOption } from '../types';
 
 interface Props {
     items: Item[];
@@ -23,37 +24,6 @@ const SORT_LABELS: Record<SortOption, string> = {
     'date-old':   'Älteste zuerst',
     'strength':   'Passwortstärke',
 };
-
-const CATEGORY_COLOR: Record<Category, string> = {
-    login:    '#0a84ff',
-    card:     '#32d74b',
-    note:     '#ff9f0a',
-    identity: '#bf5af2',
-};
-
-const CATEGORY_LABEL: Record<Category, string> = {
-    login:    'Login',
-    card:     'Karte',
-    note:     'Notiz',
-    identity: 'Identität',
-};
-
-const CATEGORIES: Category[] = ['login', 'card', 'note', 'identity'];
-
-function CategoryIcon({ category }: { category: Category }) {
-    const color = CATEGORY_COLOR[category];
-    return (
-        <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: `linear-gradient(135deg, ${color}cc, ${color}88)` }}
-        >
-            {category === 'login'    && <KeySvg />}
-            {category === 'card'     && <CardSvg />}
-            {category === 'note'     && <NoteSvg />}
-            {category === 'identity' && <UserSvg />}
-        </div>
-    );
-}
 
 export default function EntryList({
     items, selectedId, onSelect, onAdd,
@@ -175,13 +145,13 @@ export default function EntryList({
                                     className="flex-1 py-2.5 pr-3 text-left flex items-center gap-2.5 min-w-0"
                                     style={{ width: 'calc(100% - 36px)' }}
                                 >
-                                    <CategoryIcon category={item.category} />
+                                    <CategoryIcon category={item.category} size={36} />
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
                                             {item.payload.title || '(Kein Titel)'}
                                         </p>
                                         <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-2)' }}>
-                                            {item.payload.username || item.payload.url || CATEGORY_LABEL[item.category]}
+                                            {item.payload.username || item.payload.url || CATEGORY_LABELS[item.category]}
                                         </p>
                                     </div>
                                     {isSelected && !hasSelection && (
@@ -229,7 +199,7 @@ export default function EntryList({
                                             onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)')}
                                             onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                                         >
-                                            {CATEGORY_LABEL[cat]}
+                                            {CATEGORY_LABELS[cat]}
                                         </button>
                                     ))}
                                 </div>
@@ -251,18 +221,6 @@ export default function EntryList({
     );
 }
 
-function KeySvg() {
-    return <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="1.5"><circle cx="5.5" cy="8" r="3.5" /><path d="M9 8h6M13 6v4" strokeLinecap="round" /></svg>;
-}
-function CardSvg() {
-    return <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="1.5"><rect x="1" y="3" width="14" height="10" rx="1.5" /><path d="M1 6h14" strokeLinecap="round" /></svg>;
-}
-function NoteSvg() {
-    return <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="1.5"><rect x="2" y="1" width="12" height="14" rx="1.5" /><path d="M5 5h6M5 8h6M5 11h4" strokeLinecap="round" /></svg>;
-}
-function UserSvg() {
-    return <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="1.5"><circle cx="8" cy="5" r="3" /><path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5" strokeLinecap="round" /></svg>;
-}
 function SortIcon() {
     return (
         <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">

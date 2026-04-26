@@ -1,8 +1,9 @@
 import logoUrl from '../assets/logo.svg';
-import type { Category } from '../types';
+import { APP_VERSION } from '../utils/constants';
+import type { ViewCategory } from '../types';
 
-export const APP_VERSION = '1.2.0';
-export type ViewCategory = Category | 'all' | 'health' | 'favorites';
+export { APP_VERSION } from '../utils/constants';
+export type { ViewCategory } from '../types';
 
 interface Props {
     activeCategory: ViewCategory;
