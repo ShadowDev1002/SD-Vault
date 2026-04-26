@@ -7,6 +7,7 @@ import SyncSettings from './SyncSettings';
 import { APP_VERSION } from './Sidebar';
 import type { UpdateInfo } from '../App';
 import type { Theme } from '../utils/theme';
+import { useMobile } from '../utils/mobile';
 
 const GITHUB_REPO = 'ShadowDev1002/SD-Vault';
 
@@ -26,14 +27,15 @@ interface Props {
     onAccentChange: (color: string) => void;
 }
 
-const NAV: { id: Tab; label: string; icon: JSX.Element }[] = [
-    { id: 'security',   label: 'Sicherheit',    icon: <ShieldIcon /> },
-    { id: 'appearance', label: 'Anpassung',     icon: <PaletteIcon /> },
-    { id: 'sync',       label: 'Synchronisation', icon: <SyncIcon /> },
-    { id: 'about',      label: 'Über die App',  icon: <InfoIcon /> },
+const NAV: { id: Tab; label: string; shortLabel: string; icon: JSX.Element }[] = [
+    { id: 'security',   label: 'Sicherheit',      shortLabel: 'Sicherheit', icon: <ShieldIcon /> },
+    { id: 'appearance', label: 'Anpassung',       shortLabel: 'Design',     icon: <PaletteIcon /> },
+    { id: 'sync',       label: 'Synchronisation', shortLabel: 'Sync',       icon: <SyncIcon /> },
+    { id: 'about',      label: 'Über die App',    shortLabel: 'Info',       icon: <InfoIcon /> },
 ];
 
 export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onClose, onUpdateFound, updateInfo: externalUpdateInfo, theme, onThemeChange, accent, onAccentChange }: Props) {
+    const isMobile = useMobile();
     const [tab, setTab] = useState<Tab>('security');
     const [updateState, setUpdateState] = useState<UpdateState>(externalUpdateInfo ? 'available' : 'idle');
     const [latestVersion, setLatestVersion] = useState(externalUpdateInfo?.version ?? '');
@@ -62,6 +64,166 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
 
     function openUrl(url: string) {
         invoke('open_url', { url }).catch(() => {});
+    }
+
+    const aboutContent = (
+        <div className="space-y-6">
+            <div className="flex items-center gap-4">
+                <img src={logoUrl} alt="SD-Vault" className="w-14 h-14 shrink-0" />
+                <div>
+                    <h3 className="text-base font-bold text-white">SD-Vault</h3>
+                    <p className="text-sm mt-0.5" style={{ color: 'var(--text-2)' }}>Version {APP_VERSION}</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>
+                        Lokaler Passwort-Manager mit Ende-zu-Ende-Verschlüsselung
+                    </p>
+                </div>
+            </div>
+
+            <div className="border-t" style={{ borderColor: 'var(--border)' }} />
+
+            <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-white">Software-Updates</h4>
+                <button
+                    onClick={checkForUpdate}
+                    disabled={updateState === 'checking'}
+                    className="px-4 py-2 rounded-lg text-sm text-white disabled:opacity-60 transition-opacity"
+                    style={{ backgroundColor: 'var(--accent)' }}
+                >
+                    {updateState === 'checking' ? 'Prüfe…' : 'Auf Updates prüfen'}
+                </button>
+                {updateState === 'up-to-date' && (
+                    <div className="flex items-center gap-2 text-sm" style={{ color: '#22c55e' }}>
+                        <CheckIcon />
+                        <span>SD-Vault ist auf dem neuesten Stand</span>
+                    </div>
+                )}
+                {updateState === 'available' && (
+                    <div className="rounded-lg p-4 border space-y-3" style={{ borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.07)' }}>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-white">Update verfügbar</span>
+                            <span className="px-2 py-0.5 rounded text-xs font-mono" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                                v{latestVersion}
+                            </span>
+                        </div>
+                        <p className="text-xs" style={{ color: 'var(--text-2)' }}>
+                            Eine neue Version ist auf GitHub verfügbar. Aktuelle Version: v{APP_VERSION}
+                        </p>
+                        <button
+                            onClick={() => openUrl(releaseUrl)}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-white"
+                            style={{ backgroundColor: '#3b82f6' }}
+                        >
+                            Jetzt herunterladen
+                            <ExternalLinkIcon />
+                        </button>
+                    </div>
+                )}
+                {updateState === 'error' && (
+                    <p className="text-sm" style={{ color: 'var(--vault-danger)' }}>
+                        Update-Prüfung fehlgeschlagen — Internetverbindung prüfen.
+                    </p>
+                )}
+            </div>
+
+            <div className="border-t" style={{ borderColor: 'var(--border)' }} />
+
+            <div className="rounded-lg p-4 border space-y-2 text-xs leading-relaxed"
+                style={{ borderColor: 'var(--border)', backgroundColor: 'rgba(255,255,255,0.03)', color: 'var(--text-2)' }}>
+                <p className="font-semibold text-white">Haftungsausschluss</p>
+                <p>
+                    SD-Vault wird <em>so wie es ist</em> bereitgestellt — ohne jegliche Garantie.
+                    Der Entwickler haftet nicht für Datenverlust, Sicherheitslücken oder sonstige Schäden,
+                    die durch die Nutzung dieser Software entstehen.
+                </p>
+                <p>
+                    Die Sicherheit hängt von der Stärke deines Master-Passworts und dem sicheren Aufbewahren
+                    des Emergency Kits ab. Quellcode einsehbar auf GitHub (MIT-Lizenz).
+                </p>
+            </div>
+
+            <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-white">Links</h4>
+                <button
+                    onClick={() => openUrl(`https://github.com/${GITHUB_REPO}`)}
+                    className="flex items-center gap-1.5 text-sm transition-colors"
+                    style={{ color: 'var(--text-2)' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'white')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-2)')}
+                >
+                    <span>GitHub Repository</span>
+                    <ExternalLinkIcon />
+                </button>
+                <button
+                    onClick={() => openUrl(`https://github.com/${GITHUB_REPO}/releases`)}
+                    className="flex items-center gap-1.5 text-sm transition-colors"
+                    style={{ color: 'var(--text-2)' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'white')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-2)')}
+                >
+                    <span>Alle Releases</span>
+                    <ExternalLinkIcon />
+                </button>
+            </div>
+        </div>
+    );
+
+    const tabContent = (
+        <div className={isMobile ? 'p-4' : 'p-6'}>
+            {tab === 'security'   && <SecuritySettings lockTimeout={lockTimeout} onTimeoutChange={onTimeoutChange} />}
+            {tab === 'appearance' && <AppearanceSettings theme={theme} onThemeChange={onThemeChange} accent={accent} onAccentChange={onAccentChange} />}
+            {tab === 'sync'       && <SyncSettings isUnlocked={isUnlocked} />}
+            {tab === 'about'      && aboutContent}
+        </div>
+    );
+
+    if (isMobile) {
+        return (
+            <div
+                className="fixed inset-0 z-[70] flex flex-col"
+                style={{ backgroundColor: 'var(--vault-bg)' }}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 shrink-0 border-b"
+                    style={{ height: 52, backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+                    <button
+                        onClick={onClose}
+                        style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', color: 'var(--accent)' }}
+                    >
+                        <svg viewBox="0 0 16 16" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
+                    <span className="text-[17px] font-semibold" style={{ color: 'var(--text)' }}>Einstellungen</span>
+                    <div style={{ width: 44 }} />
+                </div>
+
+                {/* Tab bar */}
+                <div className="flex border-b shrink-0" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
+                    {NAV.map(({ id, shortLabel, icon }) => {
+                        const active = tab === id;
+                        return (
+                            <button
+                                key={id}
+                                onClick={() => setTab(id)}
+                                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2"
+                                style={{ color: active ? 'var(--accent)' : 'var(--text-3)' }}
+                            >
+                                <span className="w-4 h-4">{icon}</span>
+                                <span className="text-[10px] font-medium">{shortLabel}</span>
+                                {active && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5" style={{ backgroundColor: 'var(--accent)' }} />
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto">
+                    {tabContent}
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -110,124 +272,8 @@ export default function Settings({ isUnlocked, lockTimeout, onTimeoutChange, onC
                     </nav>
 
                     {/* Content */}
-                    <div className="flex-1 p-6 overflow-y-auto">
-                        {tab === 'security' && (
-                            <SecuritySettings lockTimeout={lockTimeout} onTimeoutChange={onTimeoutChange} />
-                        )}
-                        {tab === 'appearance' && (
-                            <AppearanceSettings theme={theme} onThemeChange={onThemeChange} accent={accent} onAccentChange={onAccentChange} />
-                        )}
-                        {tab === 'sync' && (
-                            <SyncSettings isUnlocked={isUnlocked} />
-                        )}
-                        {tab === 'about' && (
-                            <div className="space-y-6">
-                                {/* App identity */}
-                                <div className="flex items-center gap-4">
-                                    <img src={logoUrl} alt="SD-Vault" className="w-14 h-14 shrink-0" />
-                                    <div>
-                                        <h3 className="text-base font-bold text-white">SD-Vault</h3>
-                                        <p className="text-sm mt-0.5" style={{ color: 'var(--text-2)' }}>Version {APP_VERSION}</p>
-                                        <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>
-                                            Lokaler Passwort-Manager mit Ende-zu-Ende-Verschlüsselung
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="border-t" style={{ borderColor: 'var(--border)' }} />
-
-                                {/* Update check */}
-                                <div className="space-y-3">
-                                    <h4 className="text-sm font-semibold text-white">Software-Updates</h4>
-
-                                    <button
-                                        onClick={checkForUpdate}
-                                        disabled={updateState === 'checking'}
-                                        className="px-4 py-2 rounded-lg text-sm text-white disabled:opacity-60 transition-opacity"
-                                        style={{ backgroundColor: 'var(--accent)' }}
-                                    >
-                                        {updateState === 'checking' ? 'Prüfe…' : 'Auf Updates prüfen'}
-                                    </button>
-
-                                    {updateState === 'up-to-date' && (
-                                        <div className="flex items-center gap-2 text-sm" style={{ color: '#22c55e' }}>
-                                            <CheckIcon />
-                                            <span>SD-Vault ist auf dem neuesten Stand</span>
-                                        </div>
-                                    )}
-
-                                    {updateState === 'available' && (
-                                        <div className="rounded-lg p-4 border space-y-3" style={{ borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.07)' }}>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-semibold text-white">Update verfügbar</span>
-                                                <span className="px-2 py-0.5 rounded text-xs font-mono" style={{ backgroundColor: '#3b82f6', color: 'white' }}>
-                                                    v{latestVersion}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs" style={{ color: 'var(--text-2)' }}>
-                                                Eine neue Version ist auf GitHub verfügbar. Aktuelle Version: v{APP_VERSION}
-                                            </p>
-                                            <button
-                                                onClick={() => openUrl(releaseUrl)}
-                                                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-white"
-                                                style={{ backgroundColor: '#3b82f6' }}
-                                            >
-                                                Jetzt herunterladen
-                                                <ExternalLinkIcon />
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {updateState === 'error' && (
-                                        <p className="text-sm" style={{ color: 'var(--vault-danger)' }}>
-                                            Update-Prüfung fehlgeschlagen — Internetverbindung prüfen.
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="border-t" style={{ borderColor: 'var(--border)' }} />
-
-                                {/* Disclaimer */}
-                                <div className="rounded-lg p-4 border space-y-2 text-xs leading-relaxed"
-                                    style={{ borderColor: 'var(--border)', backgroundColor: 'rgba(255,255,255,0.03)', color: 'var(--text-2)' }}>
-                                    <p className="font-semibold text-white">Haftungsausschluss</p>
-                                    <p>
-                                        SD-Vault wird <em>so wie es ist</em> bereitgestellt — ohne jegliche Garantie.
-                                        Der Entwickler haftet nicht für Datenverlust, Sicherheitslücken oder sonstige Schäden,
-                                        die durch die Nutzung dieser Software entstehen.
-                                    </p>
-                                    <p>
-                                        Die Sicherheit hängt von der Stärke deines Master-Passworts und dem sicheren Aufbewahren
-                                        des Emergency Kits ab. Quellcode einsehbar auf GitHub (MIT-Lizenz).
-                                    </p>
-                                </div>
-
-                                {/* Links */}
-                                <div className="space-y-2">
-                                    <h4 className="text-sm font-semibold text-white">Links</h4>
-                                    <button
-                                        onClick={() => openUrl(`https://github.com/${GITHUB_REPO}`)}
-                                        className="flex items-center gap-1.5 text-sm transition-colors"
-                                        style={{ color: 'var(--text-2)' }}
-                                        onMouseEnter={e => (e.currentTarget.style.color = 'white')}
-                                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-2)')}
-                                    >
-                                        <span>GitHub Repository</span>
-                                        <ExternalLinkIcon />
-                                    </button>
-                                    <button
-                                        onClick={() => openUrl(`https://github.com/${GITHUB_REPO}/releases`)}
-                                        className="flex items-center gap-1.5 text-sm transition-colors"
-                                        style={{ color: 'var(--text-2)' }}
-                                        onMouseEnter={e => (e.currentTarget.style.color = 'white')}
-                                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-2)')}
-                                    >
-                                        <span>Alle Releases</span>
-                                        <ExternalLinkIcon />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                    <div className="flex-1 overflow-y-auto">
+                        {tabContent}
                     </div>
                 </div>
             </div>
